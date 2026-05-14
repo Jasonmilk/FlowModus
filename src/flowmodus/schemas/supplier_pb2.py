@@ -14,29 +14,43 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0esupplier.proto\x12\tflowmodus\"\x82\x02\n\x13SupplierDeclaration\x12\x13\n\x0bsupplier_id\x18\x01 \x01(\t\x12\x15\n\rsupplier_name\x18\x02 \x01(\t\x12\x10\n\x08verified\x18\x03 \x01(\x08\x12\x17\n\x0fupdated_at_unix\x18\x04 \x01(\x03\x12+\n\x06models\x18\x05 \x03(\x0b\x32\x1b.flowmodus.ModelDeclaration\x12\x31\n\tendpoints\x18\x06 \x03(\x0b\x32\x1e.flowmodus.EndpointDeclaration\x12\x34\n\ncompliance\x18\x07 \x01(\x0b\x32 .flowmodus.ComplianceDeclaration\"\xb4\x02\n\x10ModelDeclaration\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\x12\x0c\n\x04lang\x18\x03 \x01(\t\x12\x15\n\rsemantic_tags\x18\x04 \x03(\t\x12\x13\n\x0b\x61gent_roles\x18\x05 \x03(\t\x12.\n\x07\x62illing\x18\x06 \x01(\x0b\x32\x1d.flowmodus.BillingDeclaration\x12/\n\x08kv_cache\x18\x07 \x01(\x0b\x32\x1d.flowmodus.KvCacheDeclaration\x12\x38\n\x0c\x63\x61pabilities\x18\x08 \x01(\x0b\x32\".flowmodus.CapabilitiesDeclaration\x12#\n\x1btokenizer_compression_ratio\x18\t \x01(\x02\"\xa7\x01\n\x12\x42illingDeclaration\x12\x10\n\x08\x63urrency\x18\x01 \x01(\t\x12\x13\n\x0btoken_input\x18\x02 \x01(\x02\x12\x14\n\x0ctoken_output\x18\x03 \x01(\x02\x12\x12\n\ncompute_ms\x18\x04 \x01(\x02\x12\x11\n\taudio_sec\x18\x05 \x01(\x02\x12\x13\n\x0bvideo_frame\x18\x06 \x01(\x02\x12\x18\n\x10\x66ree_quota_daily\x18\x07 \x01(\x05\"\x8f\x01\n\x12KvCacheDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x13\n\x0bttl_seconds\x18\x02 \x01(\x05\x12\x19\n\x11\x63ontrol_parameter\x18\x03 \x01(\t\x12\x19\n\x11\x62reakpoint_marker\x18\x04 \x01(\t\x12\x1b\n\x13standard_compliance\x18\x05 \x01(\x08\"\xb2\x01\n\x17\x43\x61pabilitiesDeclaration\x12\x16\n\x0e\x63ontext_window\x18\x01 \x01(\x05\x12\x12\n\nmodalities\x18\x02 \x03(\t\x12\x37\n\x0ctool_calling\x18\x03 \x01(\x0b\x32!.flowmodus.ToolCallingDeclaration\x12\x32\n\tstreaming\x18\x04 \x01(\x0b\x32\x1f.flowmodus.StreamingDeclaration\"B\n\x16ToolCallingDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x15\n\rschema_format\x18\x02 \x01(\t\";\n\x14StreamingDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x10\n\x08protocol\x18\x02 \x01(\t\"\xb3\x01\n\x13\x45ndpointDeclaration\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x10\n\x08\x62\x61se_url\x18\x03 \x01(\t\x12\x13\n\x0btls_version\x18\x04 \x01(\t\x12\x13\n\x0b\x61uth_method\x18\x05 \x01(\t\x12\x10\n\x08priority\x18\x06 \x01(\x05\x12\x15\n\rprovision_url\x18\x07 \x01(\t\x12\x19\n\x11\x64ocumentation_url\x18\x08 \x01(\t\"e\n\x15\x43omplianceDeclaration\x12\x17\n\x0f\x64\x61ta_processing\x18\x01 \x01(\t\x12\x19\n\x11\x63ontent_filtering\x18\x02 \x01(\t\x12\x18\n\x10\x64\x61ta_portability\x18\x03 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0esupplier.proto\x12\tflowmodus\"\xae\x02\n\x13SupplierDeclaration\x12\x13\n\x0bsupplier_id\x18\x01 \x01(\t\x12\x15\n\rsupplier_name\x18\x02 \x01(\t\x12\x10\n\x08verified\x18\x03 \x01(\x08\x12\x17\n\x0fupdated_at_unix\x18\x04 \x01(\x03\x12+\n\x06models\x18\x05 \x03(\x0b\x32\x1b.flowmodus.ModelDeclaration\x12\x31\n\tendpoints\x18\x06 \x03(\x0b\x32\x1e.flowmodus.EndpointDeclaration\x12\x34\n\ncompliance\x18\x07 \x01(\x0b\x32 .flowmodus.ComplianceDeclaration\x12*\n\x0brate_limits\x18\x08 \x01(\x0b\x32\x15.flowmodus.RateLimits\"\xcd\x02\n\x10ModelDeclaration\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x02 \x01(\t\x12\x0c\n\x04lang\x18\x03 \x01(\t\x12\x15\n\rsemantic_tags\x18\x04 \x03(\t\x12\x13\n\x0b\x61gent_roles\x18\x05 \x03(\t\x12.\n\x07\x62illing\x18\x06 \x01(\x0b\x32\x1d.flowmodus.BillingDeclaration\x12/\n\x08kv_cache\x18\x07 \x01(\x0b\x32\x1d.flowmodus.KvCacheDeclaration\x12\x38\n\x0c\x63\x61pabilities\x18\x08 \x01(\x0b\x32\".flowmodus.CapabilitiesDeclaration\x12#\n\x1btokenizer_compression_ratio\x18\t \x01(\x02\x12\x17\n\x0f\x63\x61pability_tags\x18\n \x03(\t\"\xa7\x01\n\x12\x42illingDeclaration\x12\x10\n\x08\x63urrency\x18\x01 \x01(\t\x12\x13\n\x0btoken_input\x18\x02 \x01(\x02\x12\x14\n\x0ctoken_output\x18\x03 \x01(\x02\x12\x12\n\ncompute_ms\x18\x04 \x01(\x02\x12\x11\n\taudio_sec\x18\x05 \x01(\x02\x12\x13\n\x0bvideo_frame\x18\x06 \x01(\x02\x12\x18\n\x10\x66ree_quota_daily\x18\x07 \x01(\x05\"\x8f\x01\n\x12KvCacheDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x13\n\x0bttl_seconds\x18\x02 \x01(\x05\x12\x19\n\x11\x63ontrol_parameter\x18\x03 \x01(\t\x12\x19\n\x11\x62reakpoint_marker\x18\x04 \x01(\t\x12\x1b\n\x13standard_compliance\x18\x05 \x01(\x08\"\xb2\x01\n\x17\x43\x61pabilitiesDeclaration\x12\x16\n\x0e\x63ontext_window\x18\x01 \x01(\x05\x12\x12\n\nmodalities\x18\x02 \x03(\t\x12\x37\n\x0ctool_calling\x18\x03 \x01(\x0b\x32!.flowmodus.ToolCallingDeclaration\x12\x32\n\tstreaming\x18\x04 \x01(\x0b\x32\x1f.flowmodus.StreamingDeclaration\"B\n\x16ToolCallingDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x15\n\rschema_format\x18\x02 \x01(\t\";\n\x14StreamingDeclaration\x12\x11\n\tsupported\x18\x01 \x01(\x08\x12\x10\n\x08protocol\x18\x02 \x01(\t\"\xb3\x01\n\x13\x45ndpointDeclaration\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x10\n\x08\x62\x61se_url\x18\x03 \x01(\t\x12\x13\n\x0btls_version\x18\x04 \x01(\t\x12\x13\n\x0b\x61uth_method\x18\x05 \x01(\t\x12\x10\n\x08priority\x18\x06 \x01(\x05\x12\x15\n\rprovision_url\x18\x07 \x01(\t\x12\x19\n\x11\x64ocumentation_url\x18\x08 \x01(\t\"e\n\x15\x43omplianceDeclaration\x12\x17\n\x0f\x64\x61ta_processing\x18\x01 \x01(\t\x12\x19\n\x11\x63ontent_filtering\x18\x02 \x01(\t\x12\x18\n\x10\x64\x61ta_portability\x18\x03 \x01(\t\"5\n\nRateLimits\x12\'\n\x05tiers\x18\x01 \x03(\x0b\x32\x18.flowmodus.RateLimitTier\"\xc3\x03\n\rRateLimitTier\x12\x11\n\ttier_name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x0b\n\x03rpm\x18\x03 \x01(\x05\x12\x0b\n\x03tpm\x18\x04 \x01(\x05\x12\x0b\n\x03rpd\x18\x05 \x01(\x05\x12\x0b\n\x03tpd\x18\x06 \x01(\x05\x12\x16\n\x0emax_concurrent\x18\x07 \x01(\x05\x12\x16\n\x0ereset_schedule\x18\x08 \x01(\t\x12\x16\n\x0ereset_time_utc\x18\t \x01(\t\x12\x17\n\x0fmodels_included\x18\n \x03(\t\x12(\n\npeak_hours\x18\x0b \x01(\x0b\x32\x14.flowmodus.PeakHours\x12\x45\n\x0fmodel_overrides\x18\x0c \x03(\x0b\x32,.flowmodus.RateLimitTier.ModelOverridesEntry\x12\x32\n\rheader_format\x18\r \x01(\x0b\x32\x1b.flowmodus.RateLimitHeaders\x1aP\n\x13ModelOverridesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12(\n\x05value\x18\x02 \x01(\x0b\x32\x19.flowmodus.ModelRateLimit:\x02\x38\x01\"c\n\tPeakHours\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x10\n\x08timezone\x18\x02 \x01(\t\x12\r\n\x05start\x18\x03 \x01(\t\x12\x0b\n\x03\x65nd\x18\x04 \x01(\t\x12\x17\n\x0frpm_during_peak\x18\x05 \x01(\x05\"*\n\x0eModelRateLimit\x12\x0b\n\x03rpm\x18\x01 \x01(\x05\x12\x0b\n\x03tpm\x18\x02 \x01(\x05\"`\n\x10RateLimitHeaders\x12\x1a\n\x12remaining_requests\x18\x01 \x01(\t\x12\x18\n\x10remaining_tokens\x18\x02 \x01(\t\x12\x16\n\x0ereset_time_sec\x18\x03 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'supplier_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_RATELIMITTIER_MODELOVERRIDESENTRY']._loaded_options = None
+  _globals['_RATELIMITTIER_MODELOVERRIDESENTRY']._serialized_options = b'8\001'
   _globals['_SUPPLIERDECLARATION']._serialized_start=30
-  _globals['_SUPPLIERDECLARATION']._serialized_end=288
-  _globals['_MODELDECLARATION']._serialized_start=291
-  _globals['_MODELDECLARATION']._serialized_end=599
-  _globals['_BILLINGDECLARATION']._serialized_start=602
-  _globals['_BILLINGDECLARATION']._serialized_end=769
-  _globals['_KVCACHEDECLARATION']._serialized_start=772
-  _globals['_KVCACHEDECLARATION']._serialized_end=915
-  _globals['_CAPABILITIESDECLARATION']._serialized_start=918
-  _globals['_CAPABILITIESDECLARATION']._serialized_end=1096
-  _globals['_TOOLCALLINGDECLARATION']._serialized_start=1098
-  _globals['_TOOLCALLINGDECLARATION']._serialized_end=1164
-  _globals['_STREAMINGDECLARATION']._serialized_start=1166
-  _globals['_STREAMINGDECLARATION']._serialized_end=1225
-  _globals['_ENDPOINTDECLARATION']._serialized_start=1228
-  _globals['_ENDPOINTDECLARATION']._serialized_end=1407
-  _globals['_COMPLIANCEDECLARATION']._serialized_start=1409
-  _globals['_COMPLIANCEDECLARATION']._serialized_end=1510
+  _globals['_SUPPLIERDECLARATION']._serialized_end=332
+  _globals['_MODELDECLARATION']._serialized_start=335
+  _globals['_MODELDECLARATION']._serialized_end=668
+  _globals['_BILLINGDECLARATION']._serialized_start=671
+  _globals['_BILLINGDECLARATION']._serialized_end=838
+  _globals['_KVCACHEDECLARATION']._serialized_start=841
+  _globals['_KVCACHEDECLARATION']._serialized_end=984
+  _globals['_CAPABILITIESDECLARATION']._serialized_start=987
+  _globals['_CAPABILITIESDECLARATION']._serialized_end=1165
+  _globals['_TOOLCALLINGDECLARATION']._serialized_start=1167
+  _globals['_TOOLCALLINGDECLARATION']._serialized_end=1233
+  _globals['_STREAMINGDECLARATION']._serialized_start=1235
+  _globals['_STREAMINGDECLARATION']._serialized_end=1294
+  _globals['_ENDPOINTDECLARATION']._serialized_start=1297
+  _globals['_ENDPOINTDECLARATION']._serialized_end=1476
+  _globals['_COMPLIANCEDECLARATION']._serialized_start=1478
+  _globals['_COMPLIANCEDECLARATION']._serialized_end=1579
+  _globals['_RATELIMITS']._serialized_start=1581
+  _globals['_RATELIMITS']._serialized_end=1634
+  _globals['_RATELIMITTIER']._serialized_start=1637
+  _globals['_RATELIMITTIER']._serialized_end=2088
+  _globals['_RATELIMITTIER_MODELOVERRIDESENTRY']._serialized_start=2008
+  _globals['_RATELIMITTIER_MODELOVERRIDESENTRY']._serialized_end=2088
+  _globals['_PEAKHOURS']._serialized_start=2090
+  _globals['_PEAKHOURS']._serialized_end=2189
+  _globals['_MODELRATELIMIT']._serialized_start=2191
+  _globals['_MODELRATELIMIT']._serialized_end=2233
+  _globals['_RATELIMITHEADERS']._serialized_start=2235
+  _globals['_RATELIMITHEADERS']._serialized_end=2331
 # @@protoc_insertion_point(module_scope)

@@ -56,3 +56,4 @@ build/
 
 # Sidecar runtime data (should be generated at runtime only)
 ~/.flowmodus/
+.env.flowmodus

@@ -1,0 +1,27 @@
+{
+  "apiVersion": "flowmodus.io/v1",
+  "kind": "SupplierDefinition",
+  "suppliers": [
+    {
+      "supplier_id": "example-provider",
+      "supplier_name": "Example Provider",
+      "models": [
+        {
+          "model_id": "example-model",
+          "display_name": "Example Model",
+          "billing": { "currency": "USD", "token_input": 0.0, "token_output": 0.0 },
+          "kv_cache": { "supported": false },
+          "capabilities": { "context_window": 4096, "modalities": ["text"] }
+        }
+      ],
+      "endpoints": [
+        {
+          "type": "cloud",
+          "base_url": "https://api.example.com/v1/chat/completions",
+          "auth_method": "bearer_token",
+          "priority": 10
+        }
+      ]
+    }
+  ]
+}

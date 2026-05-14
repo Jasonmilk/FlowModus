@@ -1,117 +1,64 @@
 import time
+import json
+import traceback
 from typing import Optional
 import httpx
 from aiohttp import web
 
 from flowmodus.schemas.routing_pb2 import RawRequest, RoutingDecision
-from flowmodus.data_plane.http_utils import classify_http_error
-from flowmodus.data_plane.pipeline import (
-    Layer1Normalizer,
-    Layer2Registry,
-    Layer3CostEstimator,
-    Layer4HardFilter,
-    Layer5Scorer,
-)
-from flowmodus.data_plane.telemetry import TelemetryCollector, TTFTTimedStream
-from flowmodus.config.bias import BiasConfig
 from flowmodus.lifecycle import Sidecar, SidecarState
 
 
 class Proxy:
-    """HTTP proxy for LLM requests. Handles incoming requests, runs routing pipeline, proxies to selected supplier."""
+    """HTTP proxy for LLM requests. Routes to supplier based on call mode."""
 
-    def __init__(self, sidecar: Sidecar):
+    def __init__(self, sidecar: Sidecar, debug: bool = False) -> None:
         self._sidecar = sidecar
+        self._debug = debug
         self._app = web.Application()
         self._app.add_routes([
             web.post('/v1/chat/completions', self._handle_chat_completion),
         ])
         self._runner: Optional[web.AppRunner] = None
 
-    async def start(self, host: str = "127.0.0.1", port: int = 8080) -> None:
-        """Start the proxy server."""
+    async def start(self, host: str, port: int) -> None:
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
         site = web.TCPSite(self._runner, host, port)
         await site.start()
 
     async def stop(self) -> None:
-        """Stop the proxy server."""
         if self._runner:
             await self._runner.cleanup()
 
     async def _handle_chat_completion(self, request: web.Request) -> web.Response:
-        """Handle chat completion request."""
         if self._sidecar.state != SidecarState.READY:
-            return web.json_response(
-                {"error": "Sidecar not ready"},
-                status=503,
-            )
+            return web.json_response({"error": "Sidecar not ready"}, status=503)
 
         self._sidecar.track_inflight_request()
         try:
             body = await request.json()
             raw_request = RawRequest(
                 prompt=body.get("messages", [{}])[-1].get("content", ""),
-                agent_role=body.get("agent_role", "default"),
-                cognitive_mode=body.get("cognitive_mode", "default"),
-                max_output_tokens=body.get("max_tokens", 1024),
+                agent_role=body.get("agent_role", ""),
+                cognitive_mode=body.get("cognitive_mode", ""),
+                max_output_tokens=body.get("max_tokens", 0),
             )
 
-            decision = await self._run_pipeline(raw_request)
+            model_param = body.get("model", "auto")
+            decision = self._sidecar.resolve_routing_decision(
+                raw_request=raw_request,
+                model_param=model_param,
+                headers=dict(request.headers),
+            )
+
             return await self._proxy_request(request, decision, body)
+        except Exception as e:
+            if self._debug:
+                traceback.print_exc()
+            return web.json_response({"error": str(e)}, status=500)
         finally:
             self._sidecar.untrack_inflight_request()
-
-    async def _run_pipeline(self, raw_request: RawRequest) -> RoutingDecision:
-        """Run the 5-layer routing pipeline."""
-        # Layer 1: Normalize
-        normalized = Layer1Normalizer.normalize_request(
-            raw_request,
-            self._sidecar.tokenizer_ratios,
-        )
-
-        # Layer 2: Registry lookup
-        layer2 = Layer2Registry(self._sidecar.registry_snapshot)
-        suppliers = layer2.get_eligible_suppliers(normalized)
-
-        # Layer 3: Cost estimation
-        layer3 = Layer3CostEstimator(self._sidecar.deviation_snapshot)
-        estimates = layer3.estimate_all(normalized, suppliers)
-
-        # Layer 4: Hard filters
-        layer4 = Layer4HardFilter(
-            self._sidecar.user_constraints,
-            self._sidecar.deviation_snapshot,
-            self._sidecar.bias_config,
-            self._sidecar.health_states,
-            self._sidecar.health_timestamps,
-            self._sidecar.instance_id,
-            self._sidecar.current_minute,
-        )
-        filtered = layer4.filter(estimates)
-
-        # Convert to eligible suppliers
-        eligible = []
-        for estimate in filtered:
-            endpoint_url = self._sidecar.get_endpoint_url(
-                estimate.supplier_id, estimate.model_id
-            )
-            if endpoint_url:
-                eligible.append(
-                    self._sidecar.create_eligible_supplier(estimate, endpoint_url)
-                )
-
-        # Layer 5: Score and select
-        layer5 = Layer5Scorer(
-            normalized.agent_role,
-            self._sidecar.instance_id,
-            normalized.prompt_hash,
-            self._sidecar.bias_config,
-        )
-        decision = layer5.select(eligible)
-
-        return decision
 
     async def _proxy_request(
         self,
@@ -119,42 +66,62 @@ class Proxy:
         decision: RoutingDecision,
         body: dict,
     ) -> web.Response:
-        """Proxy the request to the selected supplier."""
         start_time = time.monotonic()
 
-        # Translate cache breakpoints into the selected supplier's format
-        adapted_body = self._sidecar.translate_cache_breakpoints(body, decision.supplier_id)
+        headers = dict(original_request.headers)
+        headers.pop("Host", None)
+        headers.pop("host", None)
+        headers.pop("Connection", None)
+        headers.pop("connection", None)
+        headers.pop("Content-Length", None)
+        headers.pop("content-length", None)
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                decision.endpoint_url,
-                json=adapted_body,
-                headers=dict(original_request.headers),
-                stream=True,
-            )
+        json_body = json.dumps(body).encode('utf-8')
+        headers["Content-Length"] = str(len(json_body))
 
-            timed_stream = TTFTTimedStream(response.aiter_bytes(), start_time)
-            aiohttp_response = web.StreamResponse(
-                status=response.status_code,
-                headers=dict(response.headers),
-            )
-            await aiohttp_response.prepare(original_request)
+        if self._debug:
+            print(f"Proxying to {decision.endpoint_url}", flush=True)
+            print(f"Request body length: {len(json_body)} bytes", flush=True)
 
-            async for chunk in timed_stream:
-                await aiohttp_response.write(chunk)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    decision.endpoint_url,
+                    content=json_body,
+                    headers=headers,
+                )
 
-            total_duration = (time.monotonic() - start_time) * 1000
-            # Collect telemetry (actual usage parsing delegated to Sidecar)
-            usage = self._sidecar.extract_usage_from_response(response)
+                if self._debug:
+                    print(f"Supplier response status: {response.status_code}", flush=True)
 
-            self._sidecar.telemetry_collector.collect_from_response(
-                supplier_id=decision.supplier_id,
-                model_id=decision.model_id,
-                status_code=response.status_code,
-                ttft_ms=timed_stream.ttft_ms or 0.0,
-                total_duration_ms=total_duration,
-                response_headers=dict(response.headers),
-                usage=usage,
-            )
+                total_duration = (time.monotonic() - start_time) * 1000
+                usage = {}
 
-            return aiohttp_response
+                self._sidecar.telemetry_collector.collect_from_response(
+                    supplier_id=decision.supplier_id,
+                    model_id=decision.model_id,
+                    status_code=response.status_code,
+                    ttft_ms=total_duration,
+                    total_duration_ms=total_duration,
+                    response_headers=dict(response.headers),
+                    usage=usage,
+                )
+
+                if response.status_code == 200:
+                    return web.json_response(
+                        status=200,
+                        data=response.json(),
+                    )
+                else:
+                    error_detail = response.text
+                    if self._debug:
+                        print(f"Supplier error: {error_detail}", flush=True)
+                    return web.json_response(
+                        status=response.status_code,
+                        data={"error": error_detail, "status": response.status_code},
+                    )
+            except Exception as e:
+                if self._debug:
+                    print(f"Proxy request failed: {e}", flush=True)
+                    traceback.print_exc()
+                return web.json_response({"error": str(e)}, status=502)

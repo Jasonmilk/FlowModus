@@ -9,6 +9,7 @@ message SupplierDeclaration {
   repeated ModelDeclaration models = 5;
   repeated EndpointDeclaration endpoints = 6;
   ComplianceDeclaration compliance = 7;
+  RateLimits rate_limits = 8;
 }
 
 message ModelDeclaration {
@@ -21,6 +22,7 @@ message ModelDeclaration {
   KvCacheDeclaration kv_cache = 7;
   CapabilitiesDeclaration capabilities = 8;
   float tokenizer_compression_ratio = 9;
+  repeated string capability_tags = 10;
 }
 
 message BillingDeclaration {
@@ -73,4 +75,43 @@ message ComplianceDeclaration {
   string data_processing = 1;
   string content_filtering = 2;
   string data_portability = 3;
+}
+
+message RateLimits {
+  repeated RateLimitTier tiers = 1;
+}
+
+message RateLimitTier {
+  string tier_name = 1;
+  string description = 2;
+  int32 rpm = 3;
+  int32 tpm = 4;
+  int32 rpd = 5;
+  int32 tpd = 6;
+  int32 max_concurrent = 7;
+  string reset_schedule = 8;
+  string reset_time_utc = 9;
+  repeated string models_included = 10;
+  PeakHours peak_hours = 11;
+  map<string, ModelRateLimit> model_overrides = 12;
+  RateLimitHeaders header_format = 13;
+}
+
+message PeakHours {
+  bool enabled = 1;
+  string timezone = 2;
+  string start = 3;
+  string end = 4;
+  int32 rpm_during_peak = 5;
+}
+
+message ModelRateLimit {
+  int32 rpm = 1;
+  int32 tpm = 2;
+}
+
+message RateLimitHeaders {
+  string remaining_requests = 1;
+  string remaining_tokens = 2;
+  string reset_time_sec = 3;
 }
