@@ -1,35 +1,36 @@
+import os
 import asyncio
-import argparse
+import signal
+
 from flowmodus.lifecycle import Sidecar, SidecarConfig
+from flowmodus.data_plane.proxy import Proxy
 
 
-def main():
-    """CLI entry point."""
-    parser = argparse.ArgumentParser(description="FlowModus Sidecar")
-    parser.add_argument("--host", default="127.0.0.1", help="Listen host")
-    parser.add_argument("--port", type=int, default=8080, help="Listen port")
-    parser.add_argument("--data-sharing", action="store_true", help="Enable data sharing")
-    args = parser.parse_args()
-    
-    # Create config
-    config = SidecarConfig(
-        data_sharing_enabled=args.data_sharing
-    )
-    
-    # Create and start sidecar
+async def _run(sidecar: Sidecar, host: str, port: int) -> None:
+    """Start proxy and wait until shutdown."""
+    proxy = Proxy(sidecar)
+    await proxy.start(host=host, port=port)
+
+    # Wait indefinitely until a signal arrives
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop_event.set)
+    await stop_event.wait()
+
+    await sidecar.shutdown(signal.SIGTERM)
+    await proxy.stop()
+
+
+def main() -> None:
+    """CLI entry point – all defaults are read from the environment."""
+    config = SidecarConfig()
     sidecar = Sidecar(config)
-    
-    # Run
-    asyncio.run(_run(sidecar, args.host, args.port))
 
+    host = config.proxy_host
+    port = config.proxy_port
 
-async def _run(sidecar: Sidecar, host: str, port: int):
-    await sidecar.start()
-    await sidecar.proxy.start(host, port)
-    
-    # Wait forever
-    while sidecar.state != SidecarState.DEAD:
-        await asyncio.sleep(1.0)
+    asyncio.run(_run(sidecar, host, port))
 
 
 if __name__ == "__main__":

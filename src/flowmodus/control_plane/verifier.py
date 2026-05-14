@@ -4,7 +4,7 @@ from cryptography.exceptions import InvalidSignature
 
 # Protocol root public key (compiled-in constant)
 # This is the public part of the offline-generated root key
-PROTOCOL_ROOT_PUBLIC_KEY_BYTES: bytes = b''  # TODO: Fill with actual public key
+PROTOCOL_ROOT_PUBLIC_KEY_BYTES = bytes.fromhex("a914abdc99f277d64aafdd2c4db2ee73d468001e65747a823af50bb5a6dc3cf9")
 
 
 def verify_registry(
