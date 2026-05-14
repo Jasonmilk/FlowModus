@@ -4,7 +4,7 @@ import asyncio
 
 from flowmodus.schemas.metrics_pb2 import TelemetrySample
 from .deviation import calculate_deviation
-from ..proxy import classify_http_error
+from flowmodus.data_plane.http_utils import classify_http_error
 
 
 class TTFTTimedStream:

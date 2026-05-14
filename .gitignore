@@ -1,0 +1,56 @@
+# FlowModus .gitignore
+# Version: v1.1.3
+# This file ensures that generated, cached, and environment-specific files
+# are not committed to the repository.
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Compiled protobuf sources (generated from .proto files)
+schemas/*_pb2.py
+schemas/*_pb2.pyi
+
+# Virtual environment (managed by uv)
+.venv/
+venv/
+
+# Environment files (user secrets and API keys)
+.env
+.env.*
+
+# User-specific bias configuration (belongs in ~/.flowmodus/)
+bias.yaml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test coverage and reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Distribution and packaging
+dist/
+build/
+*.egg-info/
+
+# Local configuration overrides (never commit personal settings)
+*.local.yaml
+*.local.json
+
+# IPFS local data (node-specific)
+.ipfs/
+
+# Sidecar runtime data (should be generated at runtime only)
+~/.flowmodus/
