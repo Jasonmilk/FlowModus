@@ -1,0 +1,12 @@
+syntax = "proto3";
+package flowmodus;
+
+import "supplier.proto";
+
+// Registry package for signed supplier registry
+message RegistryPackage {
+  string version = 1;
+  int64 published_at_unix = 2;
+  repeated SupplierDeclaration suppliers = 3;
+  repeated string signatures = 4;
+}

@@ -1,0 +1,76 @@
+syntax = "proto3";
+package flowmodus;
+
+message SupplierDeclaration {
+  string supplier_id = 1;
+  string supplier_name = 2;
+  bool verified = 3;
+  int64 updated_at_unix = 4;
+  repeated ModelDeclaration models = 5;
+  repeated EndpointDeclaration endpoints = 6;
+  ComplianceDeclaration compliance = 7;
+}
+
+message ModelDeclaration {
+  string model_id = 1;
+  string display_name = 2;
+  string lang = 3;
+  repeated string semantic_tags = 4;
+  repeated string agent_roles = 5;
+  BillingDeclaration billing = 6;
+  KvCacheDeclaration kv_cache = 7;
+  CapabilitiesDeclaration capabilities = 8;
+  float tokenizer_compression_ratio = 9;
+}
+
+message BillingDeclaration {
+  string currency = 1;
+  float token_input = 2;
+  float token_output = 3;
+  float compute_ms = 4;
+  float audio_sec = 5;
+  float video_frame = 6;
+  int32 free_quota_daily = 7;
+}
+
+message KvCacheDeclaration {
+  bool supported = 1;
+  int32 ttl_seconds = 2;
+  string control_parameter = 3;
+  string breakpoint_marker = 4;
+  bool standard_compliance = 5;
+}
+
+message CapabilitiesDeclaration {
+  int32 context_window = 1;
+  repeated string modalities = 2;
+  ToolCallingDeclaration tool_calling = 3;
+  StreamingDeclaration streaming = 4;
+}
+
+message ToolCallingDeclaration {
+  bool supported = 1;
+  string schema_format = 2;
+}
+
+message StreamingDeclaration {
+  bool supported = 1;
+  string protocol = 2;
+}
+
+message EndpointDeclaration {
+  string type = 1;
+  string region = 2;
+  string base_url = 3;
+  string tls_version = 4;
+  string auth_method = 5;
+  int32 priority = 6;
+  string provision_url = 7;
+  string documentation_url = 8;
+}
+
+message ComplianceDeclaration {
+  string data_processing = 1;
+  string content_filtering = 2;
+  string data_portability = 3;
+}
