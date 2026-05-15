@@ -1,7 +1,6 @@
-# src/flowmodus/data_plane/telemetry/collector.py
 import time
 import sqlite3
-import json
+import os
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 
@@ -10,28 +9,28 @@ from .deviation import calculate_deviation
 from flowmodus.data_plane.http_utils import classify_http_error
 
 
-# --- In-Memory Snapshot ---
 @dataclass
 class DeviationSnapshot:
     """Immutable snapshot of claim deviations, read by the pipeline."""
     deviations: Dict[str, Dict[str, float]] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access to supplier deviation data."""
+        return self.deviations.get(key, default)
 
     def get_deviation(self, supplier_id: str, metric_name: str) -> Optional[float]:
         return self.deviations.get(supplier_id, {}).get(metric_name)
 
 
 class TTFTTimedStream:
-    """
-    Wrapper for response stream to measure Time To First Token (TTFT).
-    Zero-burden, no polling, only measures on first chunk.
-    """
-    
+    """Wrapper for response stream to measure Time To First Token (TTFT)."""
+
     def __init__(self, response_stream, start_time: float):
         self._stream = response_stream
         self._start_time = start_time
         self._first_chunk = True
         self.ttft_ms: Optional[float] = None
-    
+
     async def __aiter__(self):
         async for chunk in self._stream:
             if self._first_chunk:
@@ -41,26 +40,18 @@ class TTFTTimedStream:
 
 
 class TelemetryCollector:
-    """
-    Passive telemetry collector.
-    Collects metrics from real business requests, no active probing.
-    Updates an immutable in-memory snapshot for pipeline consumption.
-    """
-    
+    """Passive telemetry collector. Writes to SQLite, updates in-memory snapshot."""
+
     DB_PATH = "~/.flowmodus/metrics.db"
-    
+
     def __init__(self, snapshot: Optional[DeviationSnapshot] = None):
         self._snapshot = snapshot or DeviationSnapshot()
         self._db_connection = None
         self._init_db()
-    
-    # --- Database Initialization ---
+
     def _init_db(self) -> None:
-        """Initialize local SQLite database with required tables."""
-        import os
         db_path = os.path.expanduser(self.DB_PATH)
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
         self._db_connection = sqlite3.connect(db_path, check_same_thread=False)
         self._db_connection.execute("""
             CREATE TABLE IF NOT EXISTS telemetry_samples (
@@ -88,8 +79,7 @@ class TelemetryCollector:
             );
         """)
         self._db_connection.commit()
-    
-    # --- Telemetry Collection ---
+
     def collect_from_response(
         self,
         supplier_id: str,
@@ -101,9 +91,7 @@ class TelemetryCollector:
         usage: Dict[str, int],
         error: Optional[Exception] = None,
     ) -> TelemetrySample:
-        """Collect telemetry sample from a completed response."""
         health_state = classify_http_error(status_code, error)
-        
         sample = TelemetrySample(
             supplier_id=supplier_id,
             model_id=model_id,
@@ -115,36 +103,28 @@ class TelemetryCollector:
             status_code=status_code,
             health_state=health_state,
         )
-        
         self._store_sample(sample)
-        
-        # Rebuild and atomically swap the in-memory snapshot
         new_snapshot = self._build_snapshot()
         self._snapshot = new_snapshot
-        
         return sample
-    
+
     def _check_cache_hit(self, response_headers: Dict[str, str]) -> bool:
-        """Detect KV cache hit from standard response headers."""
         if response_headers.get("x-cache") == "HIT":
             return True
         if response_headers.get("anthropic-cache") == "hit":
             return True
         return False
-    
+
     def _store_sample(self, sample: TelemetrySample) -> None:
-        """Insert a telemetry sample into the local SQLite database."""
         if not self._db_connection:
             return
         self._db_connection.execute(
             "INSERT INTO telemetry_samples (supplier_id, model_id, sample_time_unix, ttft_ms, total_duration_ms, kv_cache_hit, billed_tokens, status_code, health_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (sample.supplier_id, sample.model_id, sample.sample_time_unix, sample.ttft_ms, sample.total_duration_ms, int(sample.kv_cache_hit), sample.billed_tokens, sample.status_code, sample.health_state)
+            (sample.supplier_id, sample.model_id, sample.sample_time_unix, sample.ttft_ms, sample.total_duration_ms, int(sample.kv_cache_hit), sample.billed_tokens, sample.status_code, sample.health_state),
         )
         self._db_connection.commit()
-    
-    # --- Snapshot & Cleanup ---
+
     def _build_snapshot(self) -> DeviationSnapshot:
-        """Rebuild the in-memory snapshot from fresh SQLite aggregations."""
         raw_deviations: Dict[str, Dict[str, float]] = {}
         try:
             cursor = self._db_connection.execute(
@@ -158,12 +138,11 @@ class TelemetryCollector:
         except Exception:
             pass
         return DeviationSnapshot(deviations=raw_deviations)
-    
+
     @property
     def snapshot(self) -> DeviationSnapshot:
         return self._snapshot
-    
+
     def flush(self) -> None:
-        """Flush any pending telemetry data to disk."""
         if self._db_connection:
             self._db_connection.commit()

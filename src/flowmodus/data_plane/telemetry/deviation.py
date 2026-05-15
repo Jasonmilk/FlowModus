@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Dict, Optional, List
 from flowmodus.schemas.metrics_pb2 import ClaimDeviation
 
@@ -59,6 +60,10 @@ class DeviationSnapshot:
     def __init__(self, deviations: Dict[str, Dict[str, ClaimDeviation]]):
         # deviations[supplier_id][metric_name] = ClaimDeviation
         self._deviations = deviations
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access to supplier deviation data."""
+        return self._deviations.get(key, default)
+
     
     def get_deviation(self, supplier_id: str, metric_name: str) -> Optional[ClaimDeviation]:
         """

@@ -1,3 +1,4 @@
+import os
 import time
 import json
 import traceback
@@ -60,6 +61,22 @@ class Proxy:
         finally:
             self._sidecar.untrack_inflight_request()
 
+    def _resolve_api_key(self, supplier_id: str, fallback_headers: dict) -> Optional[str]:
+        """Resolve API key for a supplier, with fallback to request headers."""
+        # 1. Try dedicated environment variable
+        env_var_suffix = supplier_id.upper().replace("-", "_")
+        env_var_name = f"FLOWMODUS_API_KEY_{env_var_suffix}"
+        dedicated_key = os.getenv(env_var_name)
+        if dedicated_key:
+            return dedicated_key
+
+        # 2. Fallback to the Authorization header from the original request
+        auth_header = fallback_headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            return auth_header[len("Bearer "):]
+
+        return None
+
     async def _proxy_request(
         self,
         original_request: web.Request,
@@ -68,6 +85,9 @@ class Proxy:
     ) -> web.Response:
         start_time = time.monotonic()
 
+        # Replace the model field with the actual model_id
+        body["model"] = decision.model_id
+
         headers = dict(original_request.headers)
         headers.pop("Host", None)
         headers.pop("host", None)
@@ -75,6 +95,11 @@ class Proxy:
         headers.pop("connection", None)
         headers.pop("Content-Length", None)
         headers.pop("content-length", None)
+
+        # Inject the correct API key (with fallback)
+        api_key = self._resolve_api_key(decision.supplier_id, dict(original_request.headers))
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         json_body = json.dumps(body).encode('utf-8')
         headers["Content-Length"] = str(len(json_body))
