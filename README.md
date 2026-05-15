@@ -29,6 +29,18 @@ Every request passes through five immutable layers. No step is optional, no deci
 
 ---
 
+## 🔀 Three Call Modes
+
+FlowModus supports three routing modes, selected via the `model` parameter in the request body.
+
+| Mode | `model` value | Behavior |
+|:---|:---|:---|
+| **Manual** | `"deepseek-chat"` | Route directly to the specified model. No pipeline overhead. |
+| **Group** | `"group:fast-lane"` | Route within a user‑defined group using priority and weight. |
+| **Auto** | `"auto"` | Full 5‑layer pipeline: cost estimation, hard filtering, entropy‑weighted sampling. |
+
+---
+
 ## 🪨 Engineering Iron Laws (from the Manual)
 
 *These are non‑negotiable. Code violating any of them will not be merged.*
@@ -46,18 +58,22 @@ Every request passes through five immutable layers. No step is optional, no deci
 
 ## 🏗 Architecture
 
-FlowModus runs as a **local sidecar** (`localhost:8080`). It never sees your API keys — they are injected at the edge and never leave memory. Supplier registries are pulled from IPFS and verified with the Protocol Root Key. The system decays gracefully: if the maintainer disappears, the registry freezes and the community can fork.
+FlowModus runs as a **local sidecar** (`localhost:8080`). In a full Helix deployment, the call chain is:
 
-*Control Plane / Data Plane separation ensures that cryptographic verification never competes with your request latency.*
+```
+Anaphase‑Helix → Callosum → Tuck → FlowModus → LLM API
+```
+
+Supplier registries are pulled from IPFS and verified with the Protocol Root Key. API keys are injected at the edge — they never leave memory, never appear in logs, and are never transmitted over the gossip network.
 
 ---
 
-## 🚀 Roadmap (from the Manual)
+## 🚀 Roadmap
 
 | Phase | Timeline | Focus |
 |:---|:---|:---|
-| **Phase 1** | 0–3 months | Personal Sidecar MVP, core 5‑layer pipeline, 1‑Token probe prototype |
-| **Phase 2** | 3–6 months | Community ecosystem, IPFS/IPNS distribution, Gossip health network |
+| **Phase 1** | 0–3 months | ✅ Manual & Auto mode verified, passive telemetry, startup with local registry |
+| **Phase 2** | 3–6 months | Group mode, IPFS/IPNS distribution, Gossip health network, Tuck integration |
 | **Phase 3** | 6–12 months | Standard solidification, donation to LF AI & Data / CNCF sandbox |
 | **Phase 4** | 12+ months | Ubiquitous infrastructure, edge‑cloud unified scheduling |
 
