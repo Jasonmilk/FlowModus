@@ -68,11 +68,42 @@ Anaphase‑Helix → Callosum → Tuck → FlowModus → LLM API
 
 ---
 
+## ⚠️ 当前临时方案（Cellrix 集成前）
+
+**重要提示**：在 Cellrix 集成提供引导式 UI 之前，以下临时配置方法正在使用。**请务必记得**在后续用计划中的 `config.yaml` 和引导式设置替换掉它们。
+
+### 🔧 环境变量（临时）
+目前，必须手动导出环境变量才能启动 Sidecar：
+```bash
+export FLOWMODUS_LOCAL_REGISTRY=~/.flowmodus/local_registry.json
+export FLOWMODUS_API_KEY_DEEPSEEK=sk-...
+export FLOWMODUS_API_KEY_TUCK_LOCAL=sk-...
+export FLOWMODUS_PROXY_PORT=8080
+uv run flowmodus
+```
+*为何是临时的*：它强迫用户记忆变量名并输入冗长的命令。  
+*计划替代方案*：一个单独的 `config.yaml` 文件（见下文），最终将使用 Cellrix 引导表单。
+
+### 🔀 模型名称替换（临时）
+在自动模式中，管线目前会**在 `proxy.py` 内部**将请求体中的 `model` 字段替换为实际的供应商模型 ID（例如 `Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf`）。  
+*为何是临时的*：它修改了用户的原始请求，违反了不可变性原则。  
+*计划替代方案*：将此逻辑移入 `lifecycle.py`，使 `proxy.py` 接收到完整的决策对象，而绝不修改原始请求体。
+
+### 🗺️ Cellrix 更新后的后续步骤
+
+1. **将配置迁移至 `~/.flowmodus/config.yaml`**——一个结构化、自解释的文件，取代分散的环境变量。
+2. **修复模型名称替换**——将逻辑从 `proxy.py` 移至 `lifecycle.py`，以保持请求的不可变性。
+3. **验证 Callosum → Tuck → FlowModus 链**——确保完整的 Helix 技术栈端到端运行。
+4. **完成组级路由模式的实现**——启用 `model="group:..."` 路由。
+5. **添加流式响应支持**——正确处理 SSE 流。
+
+---
+
 ## 🚀 路线图
 
 | 阶段 | 时间 | 重点 |
 |:---|:---|:---|
-| **Phase 1** | 0–3 个月 | ✅ 手动与自动模式已验证，被动遥测，本地注册表启动 |
+| **Phase 1** | 0–3 个月 | ✅ 手动与自动模式已验证，被动遥测，本地注册表启动<br>🔜 将环境变量迁移至 config.yaml，修复模型替换逻辑，验证 Callosum 集成 |
 | **Phase 2** | 3–6 个月 | 组级路由，IPFS/IPNS 分发，Gossip 健康网络，Tuck 集成 |
 | **Phase 3** | 6–12 个月 | 标准固化，捐赠给 LF AI & Data / CNCF 沙箱 |
 | **Phase 4** | 12 个月以上 | 普及化基础设施，端-边-云统一调度 |

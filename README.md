@@ -68,11 +68,42 @@ Supplier registries are pulled from IPFS and verified with the Protocol Root Key
 
 ---
 
+## ⚠️ Current Temporary Setup (Before Cellrix Integration)
+
+**Important**: Until Cellrix integration provides a guided onboarding UI, the following temporary configuration methods are in use. **DO NOT forget to replace these** with the planned `config.yaml` and guided setup later.
+
+### 🔧 Environment Variables (TEMPORARY)
+Currently, you must manually export environment variables to start the sidecar:
+```bash
+export FLOWMODUS_LOCAL_REGISTRY=~/.flowmodus/local_registry.json
+export FLOWMODUS_API_KEY_DEEPSEEK=sk-...
+export FLOWMODUS_API_KEY_TUCK_LOCAL=sk-...
+export FLOWMODUS_PROXY_PORT=8080
+uv run flowmodus
+```
+*Why this is temporary*: It forces the user to memorize variable names and write long commands.  
+*Planned replacement*: A single `config.yaml` file (see below) and eventually a Cellrix onboarding form.
+
+### 🔀 Model Name Replacement (TEMPORARY)
+In Auto mode, the pipeline currently replaces the `model` field in the request body with the actual supplier model ID (e.g., `Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf`) **inside `proxy.py`**.  
+*Why this is temporary*: It modifies the user’s original request, violating immutability.  
+*Planned replacement*: Move this logic into `lifecycle.py` so that `proxy.py` receives a complete decision object and never alters the original request body.
+
+### 🗺️ Next Steps After Cellrix Update
+
+1. **Migrate configuration to `~/.flowmodus/config.yaml`** – a structured, self‑documenting file that replaces scattered environment variables.
+2. **Fix model name replacement** – relocate logic from `proxy.py` to `lifecycle.py` to preserve request immutability.
+3. **Verify Callosum → Tuck → FlowModus chain** – ensure the full Helix stack works end‑to‑end.
+4. **Complete Group mode implementation** – enable `model="group:..."` routing.
+5. **Add streaming response support** – handle SSE streams properly.
+
+---
+
 ## 🚀 Roadmap
 
 | Phase | Timeline | Focus |
 |:---|:---|:---|
-| **Phase 1** | 0–3 months | ✅ Manual & Auto mode verified, passive telemetry, startup with local registry |
+| **Phase 1** | 0–3 months | ✅ Manual & Auto mode verified, passive telemetry, startup with local registry<br>🔜 Migrate env vars → config.yaml, fix model replacement, verify Callosum integration |
 | **Phase 2** | 3–6 months | Group mode, IPFS/IPNS distribution, Gossip health network, Tuck integration |
 | **Phase 3** | 6–12 months | Standard solidification, donation to LF AI & Data / CNCF sandbox |
 | **Phase 4** | 12+ months | Ubiquitous infrastructure, edge‑cloud unified scheduling |
