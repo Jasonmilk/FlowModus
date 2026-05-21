@@ -1,5 +1,11 @@
 # FlowModus
 
+[Helix Ecosystem](https://github.com/Jasonmilk) ·
+[CIS](https://github.com/CommonIntents/CIS) ·
+[CAP](https://github.com/CommonIntents/CAP) ·
+[CISS](https://github.com/CommonIntents/CISS) ·
+[CIB](https://github.com/CommonIntents/CIB)
+
 **LLM API 调度的确定性协议层**
 *去中心化 · 厂商中立 · 社区共建*
 
