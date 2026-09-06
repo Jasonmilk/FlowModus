@@ -1,10 +1,13 @@
 # FlowModus
 
-[Helix Ecosystem](https://github.com/Jasonmilk) ·
-[CIS](https://github.com/CommonIntents/CIS) ·
-[CAP](https://github.com/CommonIntents/CAP) ·
-[CISS](https://github.com/CommonIntents/CISS) ·
-[CIB](https://github.com/CommonIntents/CIB)
+[Helix 生态](https://github.com/Jasonmilk) · [CommonIntents 协议家族](https://github.com/CommonIntents) ·
+[INTENT-7](https://github.com/CommonIntents/INTENT-7) · [CAPABILITY-13](https://github.com/CommonIntents/CAPABILITY-13) ·
+[INTENT-7-SECURE](https://github.com/CommonIntents/INTENT-7-SECURE) · [BIND-19](https://github.com/CommonIntents/BIND-19)
+
+> **许可证**：Apache 2.0（2026-09-06 起，见 whitepaper v1.7.1 修订记录）
+>
+> **注意**：Rust 确定性重构已完成并收口（rs 分支，83 测试全绿，CLI 可用）。
+> 本分支为 Python v1.7 冻结维护版，新开发请切 `rs` 分支（`git checkout rs`）。
 
 **The Deterministic Protocol Layer for LLM API Scheduling**  
 *Decentralized. Vendor‑Neutral. Community‑Driven.*
