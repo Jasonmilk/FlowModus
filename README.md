@@ -1,120 +1,115 @@
 # FlowModus
 
-**LLM API 调度的度量衡局（Weights & Measures Bureau）** · The Deterministic Protocol Layer for LLM API Scheduling
+**The Weights & Measures Bureau for LLM API Scheduling** · The Deterministic Protocol Layer for LLM API Scheduling
 
-[Helix 生态](https://github.com/Jasonmilk) · [CommonIntents 协议家族](https://github.com/CommonIntents) · [CI-144 语义层 INTENT-7](https://github.com/CommonIntents/INTENT-7) · [CI-144 能力层 CAPABILITY-13](https://github.com/CommonIntents/CAPABILITY-13) · [CI-144 安全层 INTENT-7-SECURE](https://github.com/CommonIntents/INTENT-7-SECURE) · [CI-144 传输层 BIND-19](https://github.com/CommonIntents/BIND-19)
+[Helix ecosystem](https://github.com/Jasonmilk) · [CommonIntents protocol family](https://github.com/CommonIntents) · [CI-144 semantics INTENT-7](https://github.com/CommonIntents/INTENT-7) · [CI-144 capability CAPABILITY-13](https://github.com/CommonIntents/CAPABILITY-13) · [CI-144 security INTENT-7-SECURE](https://github.com/CommonIntents/INTENT-7-SECURE) · [CI-144 transport BIND-19](https://github.com/CommonIntents/BIND-19)
 
-**许可证**：Apache 2.0（代码 + 白皮书，双分支同步）｜ **定位**：独立协议，零 Helix 依赖，任何 Agent 框架可消费
+**License**: Apache 2.0 (code + whitepaper, both branches in sync) | **Positioning**: independent protocol, zero Helix dependency, consumable by any agent framework
+
+> **中文版 (Chinese Version)**: [README.zh-CN.md](./README.zh-CN.md)
 
 ---
 
-## 是什么
+## What It Is
 
-FlowModus 不是网关，不是代理，不是管理台。它是一套**度量衡**——LLM API 调度的
-确定性计量标准与裁决呈现层：
+FlowModus is not a gateway, not a proxy, not an admin console. It is a set of **weights & measures** — a deterministic metering standard and adjudication presentation layer for LLM API scheduling:
 
-| 度量衡三件套 | 落地 |
+| Triad of measures | Implementation |
 |---|---|
-| **度（STE）** | 标准 Token 等价（Standard Token Equivalent）——把各家 token/计费口径折叠到同一把尺子 |
-| **校准（声明偏移量）** | 供应商声明 vs 真实遥测的偏差度量（Deviation） |
-| **检定（一致性测试）** | 五层确定性管线，同输入 → 同输出，跨进程字节级一致 |
+| **Measure (STE)** | Standard Token Equivalent — folds every vendor's token/billing conventions onto a single ruler |
+| **Calibration (declared deviation)** | deviation metric between vendor declarations and real telemetry |
+| **Verification (consistency testing)** | five-layer deterministic pipeline, same input → same output, byte-identical across processes |
 
-**核心立场（VISION v2.0-rs）**：**不判断，只呈现，判断权属于用户。**
-管线把度量、成本、过滤、评分全部呈现为确定性数据；选择由用户/编排层做出。
+**Core stance (VISION v2.0-rs)**: **it does not judge, it presents; the right to judge belongs to the user.**
+The pipeline presents metering, cost, filtering and scoring all as deterministic data; choices are made by the user/orchestration layer.
 
-## 铁律
+## Ironclad Rules
 
-- **铁律 0（零探测）**：废除一切定时心跳/主动探测。遥测 100% 寄生真实流量；
-  唯一例外 = 用户显式按需探测。
-- **五层不可变**：Normalization(STE) → Registry(Ed25519 签名) → Deviation →
-  Cost(标准化计价) → Filter(硬边界) → Score(软加权 + 熵路由)。
-- **确定性优先**：熵路由 seed = sha256(instance:request)，同输入跨进程位级一致。
-- **零硬编码**：每个默认值有来源（whitepaper / Python dataclass / one-api 语义 /
-  协议根公钥），用户可覆盖。
+- **Ironclad rule 0 (zero probing)**: no periodic heartbeats or active probing. Telemetry is 100% parasitic on real traffic; the only exception = explicit user on-demand probing.
+- **Five immutable layers**: Normalization(STE) → Registry(Ed25519 signatures) → Deviation → Cost(normalized billing) → Filter(hard boundaries) → Score(soft weighting + entropy routing).
+- **Determinism first**: entropy routing seed = sha256(instance:request), bit-identical across processes for the same input.
+- **Zero hardcoding**: every default has a source (whitepaper / Python dataclass / one-api semantics / protocol root public key), user-overridable.
 
-## 分支
+## Branches
 
-| 分支 | 内容 | 状态 |
+| Branch | Content | Status |
 |---|---|---|
-| **rs** | Rust 重构（R-1..R-6 全部完成） | ✅ 主推，83 测试全绿，clippy 零警告 |
-| **main** | Python v1.7（白皮书原版实现） | 🧊 冻结维护 |
+| **rs** | Rust rebuild (R-1..R-6 all complete) | ✅ primary, 83 tests green, clippy zero warnings |
+| **main** | Python v1.7 (original whitepaper implementation) | 🧊 frozen maintenance |
 
-rs 分支是确定性重构：三调用模式真实落地（Python 的 Group 原是占位 stub）、
-失败冷却恢复补齐（Python 的 health 只有消费者没有生产者）、canonicalizer 补
-Unicode NFC 协议缺口（Python 只做 key 排序）。
+The rs branch is the deterministic rebuild: three call modes truly landed (Python's Group was a placeholder stub), failure-cooldown recovery completed (Python's health had consumers but no producer), canonicalizer fills the Unicode NFC protocol gap (Python only sorted keys).
 
-## 运行
+## Run
 
 ```bash
 git clone https://github.com/Jasonmilk/FlowModus.git
 cd FlowModus/flowmodus-rs
 
-cargo test        # 83 passed（五层 + 三调用模式 + 控制面 + judge-points）
-cargo run -- judge "帮我探索这个主题"            # JP-1/JP-2 Rules 判定（0 tokens）
-cargo run -- measure "hello world 你好世界"      # STE（度）
-cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # 规范化 + sha256（检定）
+cargo test        # 83 passed (five layers + three call modes + control plane + judge-points)
+cargo run -- judge "帮我探索这个主题"            # JP-1/JP-2 Rules adjudication (0 tokens)
+cargo run -- measure "hello world 你好世界"      # STE (measure)
+cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # normalization + sha256 (verification)
 ```
 
-CLI 命令：`judge`（判断点 Rules 判定）/ `measure`（STE）/ `verify`（签名规范化）。
-解析用 std::env，无 clap——依赖极简。
+CLI commands: `judge` (judge-points Rules adjudication) / `measure` (STE) / `verify` (signature normalization).
+Parsing uses std::env, no clap — minimal dependencies.
 
-## 五层确定性管线
+## Five-Layer Deterministic Pipeline
 
-| 层 | 职责 | 确定性保证 |
+| Layer | Duty | Determinism guarantee |
 |---|---|---|
-| L1 Normalization | STE 估算 + prompt sha256 | ascii/4 + non-ascii/1.5，floor，min 1 |
-| L2 Registry | Ed25519 签名供应商声明 | 验签 + 结构校验（anti-corruption fail-closed） |
-| L2.5 Deviation | 声明 vs 实际偏移量 | settlement 加权（weight=i+1） |
-| L3 Cost | 标准化计价 | billing + kv 节省 ×0.9 + context_window 门 |
-| L4 Filter | 用户硬边界 | 预算/偏差容忍/供应商 bias 上限 + priority cascade + 康复判定 |
-| L5 Score | 软加权 + 熵路由 | softmax + sha256 派生种子（跨进程位级一致） |
+| L1 Normalization | STE estimate + prompt sha256 | ascii/4 + non-ascii/1.5, floor, min 1 |
+| L2 Registry | Ed25519-signed vendor declarations | signature verification + structure validation (anti-corruption fail-closed) |
+| L2.5 Deviation | declared vs actual offset | settlement weighting (weight=i+1) |
+| L3 Cost | normalized billing | billing + kv savings ×0.9 + context_window gate |
+| L4 Filter | user hard boundaries | budget/deviation tolerance/vendor bias caps + priority cascade + recovery adjudication |
+| L5 Score | soft weighting + entropy routing | softmax + sha256-derived seed (bit-identical across processes) |
 
-## 三调用模式
+## Three Call Modes
 
-- **Manual**：直连指定模型，零管线开销（`model = "s1-fast"`）
-- **Group**：用户路由组，优先级降序 + 同优先级确定性权重采样（`model = "group:fast-lane"`）
-- **Auto**：全五层管线（`model = "auto"` 或空）
+- **Manual**: direct connection to a specified model, zero pipeline overhead (`model = "s1-fast"`)
+- **Group**: user routing group, priority descending + deterministic weighted sampling within equal priority (`model = "group:fast-lane"`)
+- **Auto**: full five-layer pipeline (`model = "auto"` or empty)
 
-## 控制面与遥测
+## Control Plane & Telemetry
 
-- **canonicalizer**：递归 key 排序 + Unicode NFC + 紧凑 JSON → 签名前字节确定
-- **verifier**：Ed25519 单键 + M-of-N multisig（密钥注入，无全局可变状态）
-- **anti-corruption**：外部 JSON → 类型安全 proto，白名单 fail-closed
-- **health**：寄生失败冷却（首败 DEGRADED → 连续 5 败 TERMINAL → 成功复位），one-api 语义
-- **telemetry**：真实流量采样 + 派生聚合（hit_rate / health_counts）
+- **canonicalizer**: recursive key sorting + Unicode NFC + compact JSON → byte-deterministic before signing
+- **verifier**: Ed25519 single key + M-of-N multisig (key injection, no global mutable state)
+- **anti-corruption**: external JSON → type-safe proto, whitelist fail-closed
+- **health**: parasitic failure cooldown (first failure DEGRADED → 5 consecutive TERMINAL → success reset), one-api semantics
+- **telemetry**: real-traffic sampling + derived aggregation (hit_rate / health_counts)
 
-## 与 Helix 生态的关系
+## Relationship to the Helix Ecosystem
 
-- **独立中立**：核心 crate 零 Helix 依赖，外部可独立引用（DNA 铁律 7）
-- **判断点契约**：`docs/engineering-manual/judge-points-contract.md`（v1.1）——
-  FlowModus 提供 JP-1/JP-2 的 Rules 后端（0 tokens 确定性判定）；
-  Anaphase 侧 O-6（ADR-0024）消费方已就绪，SmallLlm 可换后端由消费方选择，
-  非法输出一律回退 Rules（fail-safe）
-- **编排边界**：并行池 / 上下文窗口感知归 FlowModus；模型选择权在 FlowModus，
-  凭证锁在 Tuck，数据主权在本地
+- **Independent and neutral**: core crate has zero Helix dependency, externally referencable (DNA rule 7)
+- **Judge-points contract**: `docs/engineering-manual/judge-points-contract.md` (v1.1) —
+  FlowModus provides the JP-1/JP-2 Rules backend (0-token deterministic adjudication);
+  Anaphase side O-6 (ADR-0024) consumer ready, SmallLlm backend swappable at consumer's
+  choice, illegal output always falls back to Rules (fail-safe)
+- **Orchestration boundary**: parallel pool / context-window awareness belong to FlowModus; model choice rests with FlowModus, credentials locked in Tuck, data sovereignty stays local
 
-## 文档链（phyt-DNA 方法论）
+## Document Chain (phyt-DNA methodology)
 
-| 文档 | 内容 | 版本 |
+| Document | Content | Version |
 |---|---|---|
-| [VISION.md](docs/VISION.md) | 度量衡宣言 | v2.0-rs |
-| [DNA.md](docs/DNA.md) | 不可变原则（铁律） | v1.1 |
-| [RNA.md](docs/RNA.md) | 方法论加载协议 | — |
-| [PLAN.md](docs/PLAN.md) | 开发导航牌 | R-0..R-6 全 ✅ |
-| [GROWTH.md](docs/GROWTH.md) | 生长记录 | 记录 0-7 |
-| [ADR-0100](docs/decisions/ADR-0100-rs-refactor.md) | rs 重构决策记录 | D1-D10 |
-| [judge-points-contract](docs/engineering-manual/judge-points-contract.md) | 判断点契约 | v1.1 |
-| [whitepaper-v1.7](docs/whitepaper-v1.7.md) | 协议白皮书 | v1.7.1 |
-| [prior-art](docs/prior-art.md) | 防御性公开 / 先有技术记录 | 2026-09-06 |
+| [VISION.md](docs/VISION.md) | Weights & Measures manifesto | v2.0-rs |
+| [DNA.md](docs/DNA.md) | immutable principles (ironclad rules) | v1.1 |
+| [RNA.md](docs/RNA.md) | methodology loading protocol | — |
+| [PLAN.md](docs/PLAN.md) | development navigation board | R-0..R-6 all ✅ |
+| [GROWTH.md](docs/GROWTH.md) | growth records | records 0-7 |
+| [ADR-0100](docs/decisions/ADR-0100-rs-refactor.md) | rs rebuild decision record | D1-D10 |
+| [judge-points-contract](docs/engineering-manual/judge-points-contract.md) | judge-points contract | v1.1 |
+| [whitepaper-v1.7](docs/whitepaper-v1.7.md) | protocol whitepaper | v1.7.1 |
+| [prior-art](docs/prior-art.md) | defensive publication / prior art record | 2026-09-06 |
 
-## 许可与保护
+## License & Protection
 
-- **Apache 2.0**：代码 + 白皮书（双分支同步，v1.7.1 变更记录可溯）
-- **NOTICE**：Apache 归属声明（见仓库根目录）
-- **防御性公开**：核心创新点已在 `docs/prior-art.md` + GitHub 公开 git 历史
-  构成 2026-09-06 的公开披露（prior art），防止第三方抢注专利
-- 参考灵感（非借用）：one-api / EchoBird（展示与管理 API 形态）——
-  明确拒绝网关 / 代理 / 管理台形态，不重复造轮子
+- **Apache 2.0**: code + whitepaper (both branches in sync, v1.7.1 change record traceable)
+- **NOTICE**: Apache attribution statement (see repository root)
+- **Defensive publication**: core innovations publicly disclosed via `docs/prior-art.md` +
+  GitHub public git history as of 2026-09-06 (prior art), preventing third-party patent scooping
+- Reference inspiration (not borrowing): one-api / EchoBird (display & API management forms) —
+  explicitly rejects gateway / proxy / admin-console forms; no wheel reinvention
 
 ---
 
