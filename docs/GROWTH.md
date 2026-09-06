@@ -79,3 +79,26 @@ deviation/raw_request+gossip）
 **验证**：cargo test 全绿；router 8 用例（parse/manual/未知模型报错/组优先级/
 权重确定性/回退/auto）+ health 5 用例（成功/降级/终结/复位/未知健康）
 **状态**：✅ 完成（下一步 R-4 控制面 canonicalizer/verifier + 遥测）
+
+## 记录 5：R-4 完成——控制面 + 寄生遥测（2026-09-06）
+
+**健康快照**：✅ R-4 全绿（76 passed：单元 65 + 控制面 e2e 4 + pipeline e2e 3 + schema 4）
+**物理事实**：
+- canonicalizer：递归 key 排序 + 字符串值 Unicode NFC + 紧凑 JSON →
+  签名前字节确定（whitepaper §2.3）；**补 Python 协议缺口**（Python 只做
+  key 排序没做 NFC，ADR-0100 D8）
+- verifier：Ed25519 单键 + M-of-N multisig（whitepaper §7.4 for-loop 语义）；
+  **密钥显式注入**（无全局可变状态，Python 模块常量 + monkeypatch 设计收敛，
+  ADR-0100 D10）；协议根公钥 = 编译期信任锚点常量（whitepaper §3.1 规定）
+- anti-corruption：外部 JSON → 类型安全 proto 手工映射（prost 0.13 无
+  serde feature，不引 pbjson 守极简依赖）；白名单 fail-closed；
+  RateLimits 按需不映射（路由不消费，ADR-0100 D9）
+- telemetry：寄生 collector（真实流量结果 → TelemetrySample append +
+  派生聚合 hit_rate/health_counts）；classify_http_error 逐字迁移；
+  SQLite 持久化裁剪为内存态（极简，持久化留 sidecar）
+- e2e 闭环：canonicalize → sign → verify → 篡改拒绝（字节级）
+**验证**：cargo test 全绿；canonicalizer 5 用例（key-sort/compact/NFC 折叠/
+确定性/非法输入）+ verifier 6 用例（单键/多签阈值/确定性/锚点解析）+
+anti-corruption 3 用例（全字段/错型拒绝/空包默认）+ telemetry 4 用例 +
+控制面 e2e 4 用例
+**状态**：✅ 完成（下一步 R-5 judge-points 契约打通）

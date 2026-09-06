@@ -1,26 +1,14 @@
 //! Control plane: canonicalizer, verifier, anti-corruption.
 //!
-//! - Canonicalizer: deterministic byte normalization (UTF-8 NFC, key-sorted
-//!   JSON, no BOM) before signing/verification (whitepaper §2.3).
-//! - Verifier: Ed25519 signature verification against hardcoded committee keys.
-//! - Anti-corruption: defense-in-depth against injection (whitepaper §3.3).
+//! - Canonicalizer: deterministic byte normalization BEFORE signing
+//!   (whitepaper §2.3): UTF-8 no BOM, recursively key-sorted compact JSON,
+//!   Unicode NFC. Byte-identical on every platform/process.
+//! - Verifier: Ed25519 signature verification — single root key and
+//!   M-of-N multisig (whitepaper §7.4: signature array + local threshold,
+//!   a for loop, no exotic cryptography).
+//! - Anti-corruption: external JSON -> type-safe protobuf messages
+//!   (whitepaper §3.3 defense-in-depth: whitelist structure check).
 
-/// Canonicalizer stub — NFC normalization lands in R-2.
-pub struct Canonicalizer;
-
-impl Canonicalizer {
-    /// Stub: pass-through.
-    pub fn canonicalize_stub(input: &str) -> String {
-        input.to_string()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stub_passes_through() {
-        assert_eq!(Canonicalizer::canonicalize_stub("abc"), "abc");
-    }
-}
+pub mod anti_corruption;
+pub mod canonicalizer;
+pub mod verifier;

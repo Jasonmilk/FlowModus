@@ -55,6 +55,30 @@ FlowModus Python v1.7 五层管线已成形（~2375 行 / 53 测试 / 5 个 prot
 - R-2+: `ed25519-dalek`（注册表验签）、`tokio` + `tonic`（sidecar 代理）；
 - 禁止：web 框架 / ORM / daemon / UI 库（DNA 铁律 6）。
 
+### D8: 控制面——canonicalizer NFC 协议缺口补全（R-4）
+
+- whitepaper §2.3 要求签名前 Unicode NFC 归一；Python v1.7 canonicalizer
+  只做 key 排序 + 紧凑 JSON，**未做 NFC**（协议缺口）。
+- rs 补全：`canonicalize_json` = 递归 key 排序（BTreeMap）→ 字符串值 NFC →
+  紧凑序列化（serde_json 默认，等价 Python `separators=(',',':'), ensure_ascii=False`）。
+- 理由：签名字节跨平台一致性的协议承诺，不应因实现偷懒而缩水。
+
+### D9: anti-corruption 映射范围——按需驱动（R-4）
+
+- Python 用 `ParseDict` 全量转换；rs 手工映射（prost 0.13 无 serde feature，
+  引入 pbjson/prost-reflect 违反 DNA 铁律 6 极简依赖）。
+- 映射覆盖 RegistryPackage / Supplier / Model / Endpoint / KvCache /
+  Capabilities / ToolCalling / Streaming / Compliance 全字段；
+  **RateLimits 不映射**（layer2 路由决策不消费，VISION "只判断你消费的"）。
+- 白名单结构校验，未知/错型字段 fail-closed（whitepaper §3.3 纵深防御）。
+
+### D10: verifier 密钥注入——无全局可变状态（R-4）
+
+- Python 用模块级 `PROTOCOL_ROOT_PUBLIC_KEY_BYTES` 常量 + 测试里 monkeypatch
+  替换（全局可变）；rs 改为**显式注入**（`verify_registry(data, sig, key)`），
+  确定性 + 无锁 + 可测。
+- 协议根公钥仍是编译期信任锚点（whitepaper §3.1 协议规定硬编码），
+  以 `PROTOCOL_ROOT_PUBLIC_KEY_BYTES` 常量默认值携带，由 sidecar 装配注入。
 ### D7: 独立中立——零 Helix 依赖
 
 - 核心 crate 不引用任何 Helix 项目 crate；judge-points 契约是**文档层**对接
@@ -72,5 +96,5 @@ proto 编译链（prost-build）首次构建较慢。
 
 ## 4. 里程碑映射
 
-R-1 骨架+schema → R-2 五层 → R-3 三调用模式+冷却恢复 → R-4 控制面+遥测 →
+R-1 骨架+schema → R-2 五层 → R-3 三调用模式+冷却恢复 → R-4 控制面+遥测（✅ 76 测试）→
 R-5 judge-points 打通 → R-6 文档链+全量验证+推送（PLAN v1.0）。

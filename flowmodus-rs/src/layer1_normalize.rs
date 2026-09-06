@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn breakpoints_parsing() {
-        assert_eq!(parse_cache_breakpoints(&headers(&[])), vec![]);
+        assert_eq!(parse_cache_breakpoints(&headers(&[])), Vec::<i32>::new());
         assert_eq!(
             parse_cache_breakpoints(&headers(&[("x-flowmodus-cache-breakpoints", "10,20,30")])),
             vec![10, 20, 30]
