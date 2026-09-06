@@ -41,7 +41,8 @@
 FlowModus 是独立协议实现，可运行于任何 LLM 调度场景；其与 CommonIntents
 CI-144 协议家族（INTENT-7 / CAPABILITY-13 / INTENT-7-SECURE / BIND-19 /
 PFP-xCF14 / SAP-xCF14）的对接属生态集成，不构成本记录的创新点。
-CI-144 家族自身的防御性公开另行维护（CommonIntents 组织，待用户拍板）。
+CI-144 家族自身的防御性公开已落地：`commonintents/.github/docs/prior-art-ci144.md`
+（2026-09-06 公开，四层协议栈 + 扩展协议创新点，证据路径见该文档）。
 
 ## 四、后续保护动作（按需驱动，非仪式）
 
