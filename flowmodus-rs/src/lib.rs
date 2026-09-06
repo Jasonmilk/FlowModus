@@ -18,6 +18,12 @@ pub mod pb {
 /// User bias configuration (migrated from Python v1.7 config/bias.py).
 pub mod config;
 
+/// Parasitic health tracker — failure cooldown + recovery (one-api semantics).
+pub mod health;
+
+/// Call-mode router — Manual / Group / Auto dispatch.
+pub mod router;
+
 /// Layer 1: protocol & measure specification (STE standard token equivalent).
 pub mod layer1_normalize;
 

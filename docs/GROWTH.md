@@ -58,3 +58,24 @@ deviation/raw_request+gossip）
 - prost proto3 message 字段生成 Option<T>（billing/kv_cache/capabilities/cost）
 **验证**：cargo test 全绿；e2e 三用例（全链路确定性/硬过滤收敛/用户 bias 反转选择）
 **状态**：✅ 完成（下一步 R-3 三调用模式 + 失败冷却恢复）
+
+## 记录 4：R-3 完成——三调用模式 + 失败冷却恢复（2026-09-06）
+
+**健康快照**：✅ R-3 全绿（55 passed：单元 48 + e2e 3 + schema 4）
+**物理事实**：
+- CallMode 解析（Python resolve_routing_decision 形状）：Manual（非空非 group 非 auto）/
+  Group（group: 前缀）/ Auto（默认）
+- Manual：registry 直查 endpoint，零管线开销（Python _manual_decision 语义）
+- **Group 真实落地**：Python _group_decision 是占位（delegate auto）→ rs 实现
+  优先级降序 + 同优先级确定性权重采样（instance-id 种子）；未知/空组回退 Auto
+- Auto：全五层（Python _auto_decision 形状，候选 score=0.0 语义照搬）
+- **HealthTracker 补齐 Python 空白**：Python health_states 只有 layer4 消费者、
+  没有生产者（失败→DEGRADED 从未实现）→ rs 实现失败冷却+恢复
+  （one-api 语义：首败 DEGRADED + 时间戳，连续 5 败 TERMINAL，成功复位；
+  DEGRADED 冷却期由 layer4 should_rehabilitate 概率放行）
+- 100% 寄生遥测：health 只吃真实请求结果，零探测零心跳（铁律 0）
+- **0 硬编码**：degrade_after=1 / terminal_after=5 来源 HealthConfig 默认
+  （one-api 语义 + 用户可覆盖，ADR-0100 D3）
+**验证**：cargo test 全绿；router 8 用例（parse/manual/未知模型报错/组优先级/
+权重确定性/回退/auto）+ health 5 用例（成功/降级/终结/复位/未知健康）
+**状态**：✅ 完成（下一步 R-4 控制面 canonicalizer/verifier + 遥测）

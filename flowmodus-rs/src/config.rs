@@ -22,11 +22,48 @@ pub struct PriorityGroup {
     pub models: Vec<String>,
 }
 
+/// A single endpoint within a user-defined routing group (Group call mode).
+#[derive(Clone, Debug)]
+pub struct GroupEndpoint {
+    pub id: String,
+    pub priority: i32,
+    pub weight: u32,
+}
+
+/// User-defined routing group with prioritized, weighted endpoints.
+#[derive(Clone, Debug, Default)]
+pub struct RoutingGroup {
+    pub description: String,
+    pub endpoints: Vec<GroupEndpoint>,
+}
+
+/// Health thresholds for the failure-cooldown tracker.
+/// Sources: one-api operational semantics (fail -> cooldown -> auto-disable
+/// after repeated failures), user-overridable. Zero-hardcode documented.
+#[derive(Clone, Debug)]
+pub struct HealthConfig {
+    /// Failures before a supplier is marked DEGRADED (default 1: first failure
+    /// degrades — matches Layer 4's expectation).
+    pub degrade_after_failures: u32,
+    /// Failures before a supplier is marked TERMINAL (one-api auto-disable).
+    pub terminal_after_failures: u32,
+}
+
+impl Default for HealthConfig {
+    fn default() -> Self {
+        Self {
+            degrade_after_failures: 1,
+            terminal_after_failures: 5,
+        }
+    }
+}
+
 /// Full user bias configuration.
 #[derive(Clone, Debug)]
 pub struct BiasConfig {
     pub supplier_biases: HashMap<String, SupplierBias>,
     pub priority_groups: Vec<PriorityGroup>,
+    pub groups: HashMap<String, RoutingGroup>,
     /// Rehabilitation probability threshold.
     /// Source: Python v1.7 `BiasConfig` default (0.001 = 0.1%), user-overridable.
     pub rehabilitation_probability: f64,
@@ -40,6 +77,7 @@ impl Default for BiasConfig {
         Self {
             supplier_biases: HashMap::new(),
             priority_groups: Vec::new(),
+            groups: HashMap::new(),
             rehabilitation_probability: 0.001,
             rehabilitation_cooldown_seconds: 300,
         }
