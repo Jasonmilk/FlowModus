@@ -120,3 +120,18 @@ anti-corruption 3 用例（全字段/错型拒绝/空包默认）+ telemetry 4 �
   （189 → ECOSYSTEM.md SSOT 当前基线）
 **验证**：cargo test 全绿 + cargo run 真实 smoke 全通
 **状态**：✅ 完成（下一步 R-6 文档链 + 全量验证 + 推送收口）
+
+## 记录 7：R-6 完成——文档链收口，rs 重构全里程碑落地（2026-09-06）
+
+**健康快照**：✅ R-6 全绿（83 passed；clippy -D warnings 零警告）
+**物理事实**：
+- clippy 全清（unnecessary_cast / is_multiple_of / if-collapse 3 项，--fix）
+- 真机验证：cargo test 全绿 + CLI judge/measure/verify 真实运行通过
+- 零硬编码自查：全部默认值有来源（whitepaper §2.2 / Python dataclass /
+  one-api 语义 / 契约 §2 示例 / 协议根公钥 §3.1），用户可覆盖
+- 依赖账本（极致节能）：prost / prost-build / serde / serde_json / sha2 /
+  ed25519-dalek / unicode-normalization —— 无 web/ORM/daemon/UI（DNA 铁律 6）
+- 文档链终态：VISION v2.0-rs ✅ / DNA v1.1 ✅ / PLAN v1.0 R-0..R-6 全 ✅ /
+  GROWTH 记录 0-7 / ADR-0100（D1-D10）/ judge-points-contract v1.1 /
+  生态同步 ECOSYSTEM.md（FlowModus 入库）
+**状态**：✅ 完成（FlowModus rs 重构全部里程碑落地；后续按需迭代）

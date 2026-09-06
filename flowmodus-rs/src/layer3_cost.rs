@@ -55,7 +55,7 @@ pub fn estimate_cost(
         supplier_id: supplier.supplier_id.clone(),
         model_id: model.model_id.clone(),
         estimated_cost_usd: total_cost as f32,
-        ste_total: ste_total as f32,
+        ste_total,
         kv_cache_applicable,
         kv_cache_savings_estimate: round6(kv_cache_savings) as f32,
     }

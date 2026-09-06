@@ -45,7 +45,7 @@ pub fn should_rehabilitate(
     } else {
         1
     };
-    (seed % modulus) == 0
+    seed.is_multiple_of(modulus)
 }
 
 /// Cascading priority-group filter (pure). Groups sorted by priority desc;
@@ -117,11 +117,10 @@ pub fn apply_hard_filters(
     let mut filtered = Vec::new();
 
     for candidate in candidates {
-        if constraints.max_cost_per_request_usd > 0.0 {
-            if candidate.estimated_cost_usd > constraints.max_cost_per_request_usd {
+        if constraints.max_cost_per_request_usd > 0.0
+            && candidate.estimated_cost_usd > constraints.max_cost_per_request_usd {
                 continue;
             }
-        }
         // `require_verified_supplier` is honored upstream (registry snapshot);
         // Python v1.7 also passes it through without extra action here.
         let deviation = deviation_snapshot.get_deviation(&candidate.supplier_id, "billing_accuracy");

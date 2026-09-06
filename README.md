@@ -145,5 +145,5 @@ cargo run -- measure "hello world 你好世界"  # STE（度）
 cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # canonical + sha256
 ```
 
-进度：R-1 骨架 ✅ → R-2 五层 ✅ → R-3 三调用模式 ✅ → R-4 控制面+遥测 ✅ → R-5 judge-points 契约 ✅（R-6 文档链收口）。
+进度：R-1..R-6 全部完成 ✅（83 测试全绿，clippy 零警告，rs 重构收口）。
 文档：docs/VISION.md（v2.0-rs 宣言）、docs/DNA.md（不可变原则）、docs/PLAN.md、docs/GROWTH.md、docs/decisions/ADR-0100、docs/engineering-manual/judge-points-contract.md（v1.1）。
