@@ -9,7 +9,7 @@
 
 | 里程碑 | 内容 | 验收 | 状态 |
 |---|---|---|---|
-| **R-0** | 立项：VISION/DNA/RNA/PLAN/GROWTH + ADR-0100 + 调研笔记 | 五件套齐 + ADR Accepted | ✅ 本轮 |
+| **R-0** | 立项：VISION/DNA/RNA/PLAN/GROWTH + 哲学审查（whitepaper 全文）+ ADR-0100 + 调研笔记 | 五件套齐 + ADR Accepted | ✅ 本轮 |
 | **R-1** | cargo 工程骨架 + schema 迁移（protobuf 继承） | `cargo build` + schema 测试 | ⏳ |
 | **R-2** | 五层流水线迁移（normalize/registry/cost/filter/score） | 行为等价（测试向量对齐 Python） | ⏳ |
 | **R-3** | 三调用模式（Manual/Group/Auto）+ 失败冷却恢复 | 模式测试全绿 | ⏳ |
@@ -27,16 +27,17 @@
 
 ## 三、R-2 五层流水线（核心）
 
-| 层 | Python 现状 | Rust 落点 | 等价判据 |
-|---|---|---|---|
-| 1 Normalize | STE 换算 | 纯函数 crate | 同 token 输入同 STE 输出 |
-| 2 Registry | Ed25519 签名声明 | ed25519-dalek 验证 | 签名验证向量对齐 |
-| 3 Cost | 实时估计+偏差 | 纯函数 + telemetry 输入 | 同遥测同成本 |
-| 4 Filter | 预算/地域/驻留 | 约束纯函数 | 同约束同过滤结果 |
-| 5 Score | 熵权重 | instance-id 去相关 | 同 instance 同排序 |
+| 层（whitepaper 定义） | Rust 落点 | 等价判据 |
+|---|---|---|
+| L1 度量规范（STE） | 纯函数 crate | 同 token 输入同 STE 输出 |
+| L2 原始模型注册表（Ed25519） | ed25519-dalek 验证 | 签名验证向量对齐 |
+| L2.5 基准测试（偏移量） | 寄生遥测 + 按需探测（无定时心跳） | 同遥测同偏移量 |
+| L3 标准化计价 | 纯函数 + telemetry 输入 | 同遥测同成本 |
+| L4 用户偏好硬边界 | 约束纯函数 | 同约束同过滤结果 |
+| L5 Agent 意图软权重 | instance-id 去相关熵路由 | 同 instance 同排序 |
 
 - 层间 protobuf（schema 强制铁律）；
-- **新增**：失败冷却 + 恢复（one-api 语义，确定性来源真实流量遥测——拒绝探测）。
+- **新增**：失败冷却 + 恢复（one-api 语义，确定性来源真实流量遥测——拒绝定时探测）。
 
 ## 四、R-3 三调用模式
 
