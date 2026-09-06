@@ -3,7 +3,7 @@ name = "flowmodus"
 version = "0.2.0-rs"
 edition = "2021"
 description = "FlowModus rs — LLM scheduling rule definer (weights-and-measures bureau). Zero Helix dependency."
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 prost = "0.13"
