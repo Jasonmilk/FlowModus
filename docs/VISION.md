@@ -2,6 +2,7 @@
 
 > **LLM 领域的度量衡局**——中立、确定性、去中心化的调度规则定义协议。
 > 版本 v2.0-rs（重构宣言）｜ 2026-09-06 ｜ Jason Milk / CommonIntents
+> © 2026 Jason Milk · Apache 2.0（防御性公开见 docs/prior-art.md）
 > 继承 whitepaper v1.7 全部哲学；**实现重构，哲学演进，度量衡为第一范式**。
 
 ---

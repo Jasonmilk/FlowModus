@@ -1,149 +1,121 @@
 # FlowModus
 
-[Helix Ecosystem](https://github.com/Jasonmilk) ·
-[CIS](https://github.com/CommonIntents/CIS) ·
-[CAP](https://github.com/CommonIntents/CAP) ·
-[CISS](https://github.com/CommonIntents/CISS) ·
-[CIB](https://github.com/CommonIntents/CIB)
+**LLM API 调度的度量衡局（Weights & Measures Bureau）** · The Deterministic Protocol Layer for LLM API Scheduling
 
-**The Deterministic Protocol Layer for LLM API Scheduling**  
-*Decentralized. Vendor‑Neutral. Community‑Driven.*
+[Helix 生态](https://github.com/Jasonmilk) · [CommonIntents 协议家族](https://github.com/CommonIntents) · [CI-144 语义层 INTENT-7](https://github.com/CommonIntents/INTENT-7) · [CI-144 能力层 CAPABILITY-13](https://github.com/CommonIntents/CAPABILITY-13) · [CI-144 安全层 INTENT-7-SECURE](https://github.com/CommonIntents/INTENT-7-SECURE) · [CI-144 传输层 BIND-19](https://github.com/CommonIntents/BIND-19)
+
+**许可证**：Apache 2.0（代码 + 白皮书，双分支同步）｜ **定位**：独立协议，零 Helix 依赖，任何 Agent 框架可消费
 
 ---
 
-### ⚡ TL;DR
+## 是什么
 
-FlowModus is a **cryptographically‑verified, deterministic routing layer** between your Agents and LLM Providers. It replaces opaque, rent‑seeking gateways with a local‑first sidecar executing a mathematically rigorous 5‑layer pipeline.
+FlowModus 不是网关，不是代理，不是管理台。它是一套**度量衡**——LLM API 调度的
+确定性计量标准与裁决呈现层：
 
-*   **Problem**: Legacy gateways route based on vendor profit, not user intent. Opaque billing, non‑deterministic latency, and compute waste.
-*   **Solution**: A zero‑waste sidecar that enforces user‑defined constraints, verifies every routing table via Ed25519, and derives all telemetry from real traffic — never active probing.
-*   **Result**: Verifiable per‑token cost attribution, full data sovereignty, and routing that obeys *your* rules, not the vendor's.
+| 度量衡三件套 | 落地 |
+|---|---|
+| **度（STE）** | 标准 Token 等价（Standard Token Equivalent）——把各家 token/计费口径折叠到同一把尺子 |
+| **校准（声明偏移量）** | 供应商声明 vs 真实遥测的偏差度量（Deviation） |
+| **检定（一致性测试）** | 五层确定性管线，同输入 → 同输出，跨进程字节级一致 |
 
-📖 [Whitepaper v1.7](docs/whitepaper-v1.7.md) · 🛠 [Engineering Manual v1.1.3](docs/engineering-manual/v1.1.3.md)
+**核心立场（VISION v2.0-rs）**：**不判断，只呈现，判断权属于用户。**
+管线把度量、成本、过滤、评分全部呈现为确定性数据；选择由用户/编排层做出。
 
----
+## 铁律
 
-## 🧬 The 5‑Layer Deterministic Pipeline
+- **铁律 0（零探测）**：废除一切定时心跳/主动探测。遥测 100% 寄生真实流量；
+  唯一例外 = 用户显式按需探测。
+- **五层不可变**：Normalization(STE) → Registry(Ed25519 签名) → Deviation →
+  Cost(标准化计价) → Filter(硬边界) → Score(软加权 + 熵路由)。
+- **确定性优先**：熵路由 seed = sha256(instance:request)，同输入跨进程位级一致。
+- **零硬编码**：每个默认值有来源（whitepaper / Python dataclass / one-api 语义 /
+  协议根公钥），用户可覆盖。
 
-Every request passes through five immutable layers. No step is optional, no decision is arbitrary.
+## 分支
 
-1.  **Normalization (STE)** – Converts vendor‑specific tokens to Standard Token Equivalents.
-2.  **Raw Registry** – Ed25519‑signed, IPFS/IPNS‑distributed supplier declarations.
-3.  **Cost Inference** – Real‑time price estimation factoring cache hints and claim deviations.
-4.  **Hard Filter** – Enforces budget, region, residency, and user‑defined bias locally.
-5.  **Entropy‑Weighted Routing** – Deterministic jitter via instance‑ID to prevent global herd effects.
+| 分支 | 内容 | 状态 |
+|---|---|---|
+| **rs** | Rust 重构（R-1..R-6 全部完成） | ✅ 主推，83 测试全绿，clippy 零警告 |
+| **main** | Python v1.7（白皮书原版实现） | 🧊 冻结维护 |
 
----
+rs 分支是确定性重构：三调用模式真实落地（Python 的 Group 原是占位 stub）、
+失败冷却恢复补齐（Python 的 health 只有消费者没有生产者）、canonicalizer 补
+Unicode NFC 协议缺口（Python 只做 key 排序）。
 
-## 🔀 Three Call Modes
+## 运行
 
-FlowModus supports three routing modes, selected via the `model` parameter in the request body.
-
-| Mode | `model` value | Behavior |
-|:---|:---|:---|
-| **Manual** | `"deepseek-chat"` | Route directly to the specified model. No pipeline overhead. |
-| **Group** | `"group:fast-lane"` | Route within a user‑defined group using priority and weight. |
-| **Auto** | `"auto"` | Full 5‑layer pipeline: cost estimation, hard filtering, entropy‑weighted sampling. |
-
----
-
-## 🪨 Engineering Iron Laws (from the Manual)
-
-*These are non‑negotiable. Code violating any of them will not be merged.*
-
-0.  **Principle of Least Action** – Zero active polling. All telemetry is parasitic. No waste.
-1.  **Determinism First** – Same input → bit‑identical output, globally decorrelated by instance‑ID.
-2.  **Pure Functions** – All routing logic is side‑effect‑free.
-3.  **Lock‑Free** – Message passing over shared memory. No deadlocks.
-4.  **No Blocking** – Async I/O only. Control plane separated from data plane.
-5.  **Schema Enforcement** – Protobuf between modules. Never raw `dict` or JSON.
-6.  **Minimal Dependencies** – No web frameworks, no ORMs, no daemons.
-7.  **Naming as Documentation** – Google style. Self‑explanatory names.
-
----
-
-## 🏗 Architecture
-
-FlowModus runs as a **local sidecar** (`localhost:8080`). In a full Helix deployment, the call chain is:
-
-```
-Anaphase‑Helix → Callosum → Tuck → FlowModus → LLM API
-```
-
-Supplier registries are pulled from IPFS and verified with the Protocol Root Key. API keys are injected at the edge — they never leave memory, never appear in logs, and are never transmitted over the gossip network.
-
----
-
-## ⚠️ Current Temporary Setup (Before Cellrix Integration)
-
-**Important**: Until Cellrix integration provides a guided onboarding UI, the following temporary configuration methods are in use. **DO NOT forget to replace these** with the planned `config.yaml` and guided setup later.
-
-### 🔧 Environment Variables (TEMPORARY)
-Currently, you must manually export environment variables to start the sidecar:
 ```bash
-export FLOWMODUS_LOCAL_REGISTRY=~/.flowmodus/local_registry.json
-export FLOWMODUS_API_KEY_DEEPSEEK=sk-...
-export FLOWMODUS_API_KEY_TUCK_LOCAL=sk-...
-export FLOWMODUS_PROXY_PORT=8080
-uv run flowmodus
+git clone https://github.com/Jasonmilk/FlowModus.git
+cd FlowModus/flowmodus-rs
+
+cargo test        # 83 passed（五层 + 三调用模式 + 控制面 + judge-points）
+cargo run -- judge "帮我探索这个主题"            # JP-1/JP-2 Rules 判定（0 tokens）
+cargo run -- measure "hello world 你好世界"      # STE（度）
+cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # 规范化 + sha256（检定）
 ```
-*Why this is temporary*: It forces the user to memorize variable names and write long commands.  
-*Planned replacement*: A single `config.yaml` file (see below) and eventually a Cellrix onboarding form.
 
-### 🔀 Model Name Replacement (TEMPORARY)
-In Auto mode, the pipeline currently replaces the `model` field in the request body with the actual supplier model ID (e.g., `Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf`) **inside `proxy.py`**.  
-*Why this is temporary*: It modifies the user’s original request, violating immutability.  
-*Planned replacement*: Move this logic into `lifecycle.py` so that `proxy.py` receives a complete decision object and never alters the original request body.
+CLI 命令：`judge`（判断点 Rules 判定）/ `measure`（STE）/ `verify`（签名规范化）。
+解析用 std::env，无 clap——依赖极简。
 
-### 🗺️ Next Steps After Cellrix Update
+## 五层确定性管线
 
-1. **Migrate configuration to `~/.flowmodus/config.yaml`** – a structured, self‑documenting file that replaces scattered environment variables.
-2. **Fix model name replacement** – relocate logic from `proxy.py` to `lifecycle.py` to preserve request immutability.
-3. **Verify Callosum → Tuck → FlowModus chain** – ensure the full Helix stack works end‑to‑end.
-4. **Complete Group mode implementation** – enable `model="group:..."` routing.
-5. **Add streaming response support** – handle SSE streams properly.
+| 层 | 职责 | 确定性保证 |
+|---|---|---|
+| L1 Normalization | STE 估算 + prompt sha256 | ascii/4 + non-ascii/1.5，floor，min 1 |
+| L2 Registry | Ed25519 签名供应商声明 | 验签 + 结构校验（anti-corruption fail-closed） |
+| L2.5 Deviation | 声明 vs 实际偏移量 | settlement 加权（weight=i+1） |
+| L3 Cost | 标准化计价 | billing + kv 节省 ×0.9 + context_window 门 |
+| L4 Filter | 用户硬边界 | 预算/偏差容忍/供应商 bias 上限 + priority cascade + 康复判定 |
+| L5 Score | 软加权 + 熵路由 | softmax + sha256 派生种子（跨进程位级一致） |
 
----
+## 三调用模式
 
-## 🚀 Roadmap
+- **Manual**：直连指定模型，零管线开销（`model = "s1-fast"`）
+- **Group**：用户路由组，优先级降序 + 同优先级确定性权重采样（`model = "group:fast-lane"`）
+- **Auto**：全五层管线（`model = "auto"` 或空）
 
-| Phase | Timeline | Focus |
-|:---|:---|:---|
-| **Phase 1** | 0–3 months | ✅ Manual & Auto mode verified, passive telemetry, startup with local registry<br>🔜 Migrate env vars → config.yaml, fix model replacement, verify Callosum integration |
-| **Phase 2** | 3–6 months | Group mode, IPFS/IPNS distribution, Gossip health network, Tuck integration |
-| **Phase 3** | 6–12 months | Standard solidification, donation to LF AI & Data / CNCF sandbox |
-| **Phase 4** | 12+ months | Ubiquitous infrastructure, edge‑cloud unified scheduling |
+## 控制面与遥测
 
----
+- **canonicalizer**：递归 key 排序 + Unicode NFC + 紧凑 JSON → 签名前字节确定
+- **verifier**：Ed25519 单键 + M-of-N multisig（密钥注入，无全局可变状态）
+- **anti-corruption**：外部 JSON → 类型安全 proto，白名单 fail-closed
+- **health**：寄生失败冷却（首败 DEGRADED → 连续 5 败 TERMINAL → 成功复位），one-api 语义
+- **telemetry**：真实流量采样 + 派生聚合（hit_rate / health_counts）
 
-## 📄 Licenses
+## 与 Helix 生态的关系
 
-*   **Core Protocol & Sidecar Base**: MIT — permanent public utility.
-*   **Enterprise Extensions**: Apache 2.0 — legal & patent protection for enterprise.
-*   **Whitepaper**: CC BY‑ND 4.0 — authoritative protocol specification.
+- **独立中立**：核心 crate 零 Helix 依赖，外部可独立引用（DNA 铁律 7）
+- **判断点契约**：`docs/engineering-manual/judge-points-contract.md`（v1.1）——
+  FlowModus 提供 JP-1/JP-2 的 Rules 后端（0 tokens 确定性判定）；
+  Anaphase 侧 O-6（ADR-0024）消费方已就绪，SmallLlm 可换后端由消费方选择，
+  非法输出一律回退 Rules（fail-safe）
+- **编排边界**：并行池 / 上下文窗口感知归 FlowModus；模型选择权在 FlowModus，
+  凭证锁在 Tuck，数据主权在本地
 
----
+## 文档链（phyt-DNA 方法论）
 
-## ⚠️ Disclaimer
+| 文档 | 内容 | 版本 |
+|---|---|---|
+| [VISION.md](docs/VISION.md) | 度量衡宣言 | v2.0-rs |
+| [DNA.md](docs/DNA.md) | 不可变原则（铁律） | v1.1 |
+| [RNA.md](docs/RNA.md) | 方法论加载协议 | — |
+| [PLAN.md](docs/PLAN.md) | 开发导航牌 | R-0..R-6 全 ✅ |
+| [GROWTH.md](docs/GROWTH.md) | 生长记录 | 记录 0-7 |
+| [ADR-0100](docs/decisions/ADR-0100-rs-refactor.md) | rs 重构决策记录 | D1-D10 |
+| [judge-points-contract](docs/engineering-manual/judge-points-contract.md) | 判断点契约 | v1.1 |
+| [whitepaper-v1.7](docs/whitepaper-v1.7.md) | 协议白皮书 | v1.7.1 |
+| [prior-art](docs/prior-art.md) | 防御性公开 / 先有技术记录 | 2026-09-06 |
 
-Pre‑release software. Provided "as‑is" without warranty. Protocol subject to change until v1.0 stable. FlowModus is a neutral technical standard and does not constitute investment advice or service guarantees.
+## 许可与保护
+
+- **Apache 2.0**：代码 + 白皮书（双分支同步，v1.7.1 变更记录可溯）
+- **NOTICE**：Apache 归属声明（见仓库根目录）
+- **防御性公开**：核心创新点已在 `docs/prior-art.md` + GitHub 公开 git 历史
+  构成 2026-09-06 的公开披露（prior art），防止第三方抢注专利
+- 参考灵感（非借用）：one-api / EchoBird（展示与管理 API 形态）——
+  明确拒绝网关 / 代理 / 管理台形态，不重复造轮子
 
 ---
 
 *Built with mathematical rigor by the FlowModus Community.*
-
-## Rust 重构（rs 分支）
-
-FlowModus rs 是 Python v1.7 的确定性重构：度量衡范式（STE / 声明偏移量 / 一致性测试）+ 五层不可变管线 + 零定时探测（铁律 0）。
-
-```bash
-git checkout rs
-cd flowmodus-rs
-cargo test        # 83 passed（五层 + 三调用模式 + 控制面 + judge-points）
-cargo run -- judge "帮我探索这个主题"   # JP-1/JP-2 Rules 判定（0 tokens）
-cargo run -- measure "hello world 你好世界"  # STE（度）
-cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # canonical + sha256
-```
-
-进度：R-1..R-6 全部完成 ✅（83 测试全绿，clippy 零警告，rs 重构收口）。
-文档：docs/VISION.md（v2.0-rs 宣言）、docs/DNA.md（不可变原则）、docs/PLAN.md、docs/GROWTH.md、docs/decisions/ADR-0100、docs/engineering-manual/judge-points-contract.md（v1.1）。
