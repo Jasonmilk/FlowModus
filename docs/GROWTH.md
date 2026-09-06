@@ -40,3 +40,21 @@
 **验证**：cargo build（21s）+ cargo test 全绿；4 个 schema 往返测试（telemetry/
 deviation/raw_request+gossip）
 **状态**：✅ 完成（下一步 R-2 五层行为等价迁移）
+
+## 记录 3：R-2 完成——五层行为等价迁移（2026-09-06）
+
+**健康快照**：✅ R-2 全绿（43 passed：单元 36 + e2e 3 + schema 4）
+**物理事实**：
+- L1 STE（estimate_token_count 启发式 ascii/4+non-ascii/1.5，Python 语义含 floor/边界）
+- L2 registry（agent_role 匹配优先，无匹配回退全量）
+- L2.5 deviation（Python claimed==0 语义 + settlement 加权 + snapshot 双查询）
+- L3 cost（billing 计价 + kv savings 0.9 + context_window 门）
+- L4 filter（预算/deviation 容忍/bias cap + priority cascade + rehab 康复）
+- L5 score（softmax + 熵路由 instance-id 去相关 + role bonus +10）
+- **确定性改进**：Python rehab 用内置 hash()（跨进程随机）→ rs 用 sha256 派生
+  （同输入跨进程位级一致，ADR-0100 D4）；候选顺序保持 Python 输入序（不排序）
+- **0 硬编码**：kv_cache 默认 300/"cache_control" 标注来源（whitepaper §2.2 示例）；
+  rehab 默认 0.001/300 标注来源（Python dataclass 默认，用户可覆盖）
+- prost proto3 message 字段生成 Option<T>（billing/kv_cache/capabilities/cost）
+**验证**：cargo test 全绿；e2e 三用例（全链路确定性/硬过滤收敛/用户 bias 反转选择）
+**状态**：✅ 完成（下一步 R-3 三调用模式 + 失败冷却恢复）

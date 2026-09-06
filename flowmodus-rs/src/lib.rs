@@ -15,6 +15,9 @@ pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/flowmodus.rs"));
 }
 
+/// User bias configuration (migrated from Python v1.7 config/bias.py).
+pub mod config;
+
 /// Layer 1: protocol & measure specification (STE standard token equivalent).
 pub mod layer1_normalize;
 

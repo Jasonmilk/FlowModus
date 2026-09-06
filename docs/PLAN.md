@@ -11,7 +11,7 @@
 |---|---|---|---|
 | **R-0** | 立项：VISION/DNA/RNA/PLAN/GROWTH + 哲学审查（whitepaper 全文）+ ADR-0100 + 调研笔记 | 五件套齐 + ADR Accepted | ✅ 本轮 |
 | **R-1** | cargo 工程骨架 + schema 迁移（protobuf 继承） | `cargo build` + schema 测试 | ✅ 14 passed |
-| **R-2** | 五层流水线迁移（L1 STE / L2 注册表 / L2.5 偏移量 / L3 计价 / L4 过滤 / L5 打分） | 行为等价（测试向量对齐 Python） | 🔄 进行中 |
+| **R-2** | 五层流水线迁移（L1 STE / L2 注册表 / L2.5 偏移量 / L3 计价 / L4 过滤 / L5 打分） | 行为等价（测试向量对齐 Python） | ✅ 43 passed |
 | **R-3** | 三调用模式（Manual/Group/Auto）+ 失败冷却恢复 | 模式测试全绿 | ⏳ |
 | **R-4** | 控制面（verifier/anti-corruption）+ 遥测（寄生，零探测） | grep 无探测字面量 | ⏳ |
 | **R-5** | judge-points 契约打通（JP 升级链与调度语义对接） | JP-1/JP-2 可配 + 测试 | ⏳ |
