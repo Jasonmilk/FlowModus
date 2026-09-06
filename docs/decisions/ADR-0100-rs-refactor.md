@@ -1,0 +1,76 @@
+# ADR-0100: FlowModus rs 重构立项——度量衡范式的 Rust 落点
+
+- **状态**: Accepted（用户审查 VISION v2.0-rs 放行）
+- **日期**: 2026-09-06
+- **决策范围**: FlowModus（Python v1.7 → Rust rs 分支）
+- **关联**: VISION v2.0-rs / DNA v1.1 / PLAN v1.0 / whitepaper v1.7 / manual v1.1.3 /
+  judge-points-contract v1.0-draft
+
+## 1. 背景
+
+FlowModus Python v1.7 五层管线已成形（~2375 行 / 53 测试 / 5 个 protobuf schema），
+但工程形态为解释型脚本，无法满足"度量衡局"对确定性、可分发、零依赖的长期承诺
+（Phase 3：多语言参考实现）。用户授权 rs 分支重构，要求哲学继承、行为等价、
+铁律生效。
+
+## 2. 决策
+
+### D1: 工程形态——单 crate 模块化（flowmodus-rs/）
+
+- 仓库 rs 分支内新建 `flowmodus-rs/` 独立 crate（包名 `flowmodus`）；
+- Python v1.7 源码保留为**行为参照**（物理事实优先：等价迁移以真实代码为准）；
+- 模块 = 五层管线（layer1..layer5）+ control_plane + telemetry + cli；
+  层间经 protobuf 契约（DNA 铁律 5），不物理分 crate（如无必要勿增实体）。
+
+### D2: 探测立场裁决——铁律 0 优先（修正 whitepaper 滞后）
+
+- whitepaper v1.7 §5.5 "每小时 Canary Probe" 为文档滞后；manual v1.1.3 铁律 0
+  （更晚更严）为准：**废除定时探测，遥测 100% 寄生真实流量；唯一例外 = 用户显式
+  按需探测（成本提前告知）**；
+- L2.5 声明偏移量 = 寄生遥测 + 按需探测派生；无心跳、无轮询；
+- **后续动作**：whitepaper 下一版本（v1.8）修订 §5.5 对齐铁律 0。
+
+### D3: 不造轮子边界——拒绝网关形态
+
+- 不实现 one-api/EchoBird 式网关/管理台/UI（VISION §七）；
+- 仅吸收成熟运维语义：**失败冷却 + 恢复**（确定性，来源真实流量遥测）入
+  L4/L5 辅助；模型别名/重定向（注册表层可验证映射）；
+- 展示/管理/驾驶舱属消费者（Cellrix），不进 FlowModus。
+
+### D4: 熵增路由的确定性语义
+
+- 熵增路由 = instance-id 去相关：同 instance-id 同输入 → 位级相同输出（确定性
+  保留）；不同 instance-id 才分散（防羊群）；
+- 概率分布抽样在 L5 内完成，输入含 instance-id 派生种子，无全局随机。
+
+### D5: 迁移策略——行为等价
+
+- Python 53 测试语义 → Rust 测试向量对齐（同输入同输出）；
+- 5 个 protobuf 契约原样编译进 crate（prost-build），字段/语义零改动；
+- 新增长：失败冷却恢复测试、确定性熵路由测试（同种子同输出）。
+
+### D6: 依赖极简清单（按需加载）
+
+- R-1: `prost` / `prost-build` / `serde`；
+- R-2+: `ed25519-dalek`（注册表验签）、`tokio` + `tonic`（sidecar 代理）；
+- 禁止：web 框架 / ORM / daemon / UI 库（DNA 铁律 6）。
+
+### D7: 独立中立——零 Helix 依赖
+
+- 核心 crate 不引用任何 Helix 项目 crate；judge-points 契约是**文档层**对接
+  （消费者消费 FlowModus 数据标准），非代码依赖。
+
+## 3. 后果
+
+**正面**：度量衡三件套（STE/偏移量/一致性测试）获得可编译、可分发、可验证的
+确定性实现；独立中立承诺在代码层落地（零 Helix 依赖可被外部引用验证）；
+铁律 0 与 whitepaper 的矛盾在 rs 中一次性收敛。
+**负面**：Rust 生态无 Python 便利性，五层迁移需逐层行为对齐（测试向量驱动）；
+proto 编译链（prost-build）首次构建较慢。
+**风险**：行为等价迁移遗漏 Python 边角语义 → 对策：以 Python 测试为逐层对齐
+基准，R-2 每层迁移即跑对照向量。
+
+## 4. 里程碑映射
+
+R-1 骨架+schema → R-2 五层 → R-3 三调用模式+冷却恢复 → R-4 控制面+遥测 →
+R-5 judge-points 打通 → R-6 文档链+全量验证+推送（PLAN v1.0）。

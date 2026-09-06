@@ -131,3 +131,16 @@ Pre‑release software. Provided "as‑is" without warranty. Protocol subject to
 ---
 
 *Built with mathematical rigor by the FlowModus Community.*
+
+## Rust 重构（rs 分支）
+
+FlowModus rs 是 Python v1.7 的确定性重构：度量衡范式（STE / 声明偏移量 / 一致性测试）+ 五层不可变管线 + 零定时探测（铁律 0）。
+
+```bash
+git checkout rs
+cd flowmodus-rs
+cargo test        # 14 passed（schema 往返 + 模块骨架）
+```
+
+进度：R-1 骨架+schema ✅ → R-2 五层行为等价迁移（进行中）。
+文档：docs/VISION.md（v2.0-rs 宣言）、docs/DNA.md（不可变原则）、docs/PLAN.md、docs/GROWTH.md、docs/decisions/ADR-0100。

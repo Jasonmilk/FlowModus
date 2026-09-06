@@ -1,0 +1,23 @@
+syntax = "proto3";
+package flowmodus;
+
+message TelemetrySample {
+  string supplier_id = 1;
+  string model_id = 2;
+  int64 sample_time_unix = 3;
+  float ttft_ms = 4;
+  float total_duration_ms = 5;
+  bool kv_cache_hit = 6;
+  int32 billed_tokens = 7;
+  int32 status_code = 8;
+  string health_state = 9;
+}
+
+message ClaimDeviation {
+  string supplier_id = 1;
+  string metric_name = 2;
+  float claimed_value = 3;
+  float actual_value = 4;
+  float deviation_percent = 5;
+  int64 calculated_at_unix = 6;
+}

@@ -1,0 +1,57 @@
+syntax = "proto3";
+package flowmodus;
+
+message RawRequest {
+  string prompt = 1;
+  string agent_role = 2;
+  string cognitive_mode = 3;
+  int32 max_output_tokens = 4;
+  map<string, string> extra_headers = 5;
+}
+
+message NormalizedRequest {
+  string prompt_hash = 1;
+  int32 estimated_input_tokens = 2;
+  int32 max_output_tokens = 3;
+  string agent_role = 4;
+  string cognitive_mode = 5;
+  float ste_input = 6;
+  float ste_output_estimated = 7;
+  repeated int32 cache_breakpoints = 8;
+}
+
+message CostEstimate {
+  string supplier_id = 1;
+  string model_id = 2;
+  float estimated_cost_usd = 3;
+  float ste_total = 4;
+  bool kv_cache_applicable = 5;
+  float kv_cache_savings_estimate = 6;
+}
+
+message UserConstraints {
+  float max_cost_per_request_usd = 1;
+  repeated string require_regions = 2;
+  repeated string require_modalities = 3;
+  bool require_verified_supplier = 4;
+  float max_claim_deviation_tolerance = 5;
+}
+
+message EligibleSupplier {
+  string supplier_id = 1;
+  string model_id = 2;
+  string endpoint_url = 3;
+  float score = 4;
+  float claim_deviation = 5;
+  CostEstimate cost = 6;
+}
+
+message RoutingDecision {
+  string supplier_id = 1;
+  string model_id = 2;
+  string endpoint_url = 3;
+  float estimated_cost_usd = 4;
+  string kv_cache_parameter = 5;
+  int32 kv_cache_ttl = 6;
+  string request_id = 7;
+}

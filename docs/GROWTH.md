@@ -29,3 +29,14 @@
   铁律 0 已收紧（废除定时探测，唯一例外按需）——rs 以铁律 0 为准（ADR-0100 记录）
 **验证**：whitepaper 579 行全文精读；VISION 立场表对照 whitepaper 逐条核对
 **状态**：✅ 完成（下一步 ADR-0100 + R-1 cargo 骨架）
+
+## 记录 2：R-1 完成——cargo 骨架 + schema 迁移（2026-09-06）
+
+**健康快照**：✅ R-1 全绿（14 passed：单元 10 + schema 集成 4）
+**物理事实**：
+- rs 分支已建；flowmodus-rs/ 独立 crate（prost 0.13 编译 5 个 proto 成功）
+- prost 生成文件**无外层 package mod**（文件名即 package 名）——lib.rs 直接 include
+- prost Message trait 在根（`use prost::Message`，非 prost::message）
+**验证**：cargo build（21s）+ cargo test 全绿；4 个 schema 往返测试（telemetry/
+deviation/raw_request+gossip）
+**状态**：✅ 完成（下一步 R-2 五层行为等价迁移）
