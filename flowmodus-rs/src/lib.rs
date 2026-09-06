@@ -49,5 +49,8 @@ pub mod control_plane;
 /// Telemetry: collector (parasitic) + deviation (declaration vs actual).
 pub mod telemetry;
 
+/// Judge points — deterministic 0-token Rules backends (contract §1/§2).
+pub mod judge_points;
+
 /// CLI entrypoint (sidecar).
 pub mod cli;

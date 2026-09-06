@@ -102,3 +102,21 @@ deviation/raw_request+gossip）
 anti-corruption 3 用例（全字段/错型拒绝/空包默认）+ telemetry 4 用例 +
 控制面 e2e 4 用例
 **状态**：✅ 完成（下一步 R-5 judge-points 契约打通）
+
+## 记录 6：R-5 完成——judge-points 契约打通（2026-09-06）
+
+**健康快照**：✅ R-5 全绿（83 passed：单元 72 + 控制面 e2e 4 + pipeline e2e 3 + schema 4）
+**物理事实**：
+- judge_points 模块落地契约 §1/§2 全部 Rules 后端（0 tokens 确定性判定）：
+  JP-1 judge_suggested_mode（长度启发式）、JP-2 judge_budget_tier（长度+关键词表）
+- 输出枚举 SuggestedMode/BudgetTier = 确定性契约面（后端切换不改变下游枚举）
+- JudgePointsConfig 注入（默认值 = 契约 §2 示例启发式，用户可覆盖，0 硬编码）
+- CLI 真实化：`flowmodus judge/measure/verify`（std::env 解析，不引 clap 守
+  极简依赖）；src/main.rs 补 bin target（此前 lib-only 无法 cargo run）
+- 真机验证：judge 中文短句→simple/endogenous、200 字符→complex/exogenous、
+  measure "hello world 你好世界"→ste=5（Python 语义 11/4+4/1.5=5.42 截断）、
+  verify 输出 canonical_len + sha256、未知命令 exit=2
+- 契约 v1.1：§0.5 声明 Rules 后端由 FlowModus 提供；§6 基线口径修正
+  （189 → ECOSYSTEM.md SSOT 当前基线）
+**验证**：cargo test 全绿 + cargo run 真实 smoke 全通
+**状态**：✅ 完成（下一步 R-6 文档链 + 全量验证 + 推送收口）

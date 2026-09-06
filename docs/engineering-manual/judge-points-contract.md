@@ -1,6 +1,6 @@
 # 判断点契约（Judge-Points Contract）
 
-**版本**：v1.0-draft（不冻结，随生态演进）
+**版本**：v1.1-draft（不冻结，随生态演进）
 **日期**：2026-09-06
 **消费方**：Anaphase-Helix（编排中枢）
 **提供方**：FlowModus（LLM API 调度层，5 层确定性流水线）
@@ -21,6 +21,23 @@ Anaphase 按此契约在判断点选择后端。
 - **显式选择**，不做系统级 Auto Router（M3 边界：禁无脑自动路由，不禁按需判断点）；
 - SmallLlm 失败一律回退 Rules（fail-safe，确定性优先）；
 - 每个判断点有唯一编号（JP-x），跨文档引用。
+
+---
+
+## §0.5 Rules 后端提供方（v1.1 新增）
+
+FlowModus rs 侧已落地 judge_points 模块，承载本契约全部 **Rules 后端**
+（0 tokens 确定性判定，ADR 语义）：
+
+- JP-1 → `judge_suggested_mode(input, cfg)`：长度启发式（skilled_len /
+  anchor_len，JudgePointsConfig 注入，默认值来源 §2 示例，用户可覆盖）
+- JP-2 → `judge_budget_tier(input, cfg)`：长度 + explore_keywords 表
+- 输出枚举 `SuggestedMode` / `BudgetTier` 是确定性契约面（后端切换不改变
+  下游枚举）；SmallLlm 可换后端由消费方（Anaphase）选择，非法输出一律
+  回退本模块 Rules（fail-safe）
+
+验证：`cargo test` 全绿（judge_points 4 用例）；CLI `flowmodus judge <text>`
+可真实运行（0 tokens 呈现 suggested_mode + budget_tier）。
 
 ---
 
@@ -97,7 +114,7 @@ Anaphase 按此契约在判断点选择后端。
 1. 每个判断点：后端可配置（config），默认 Rules（0 tokens 优先）；
 2. SmallLlm 输出非法 → 回退 Rules，无半结构化污染（fail-safe）；
 3. 下游枚举（suggested_mode / budget_tier）不变——后端切换对编排透明；
-4. 全生态测试数不回退（Anaphase 189 基线）。
+4. 全生态测试数不回退（以 ECOSYSTEM.md SSOT 当前基线为准）。
 
 ---
 

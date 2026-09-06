@@ -139,8 +139,11 @@ FlowModus rs 是 Python v1.7 的确定性重构：度量衡范式（STE / 声明
 ```bash
 git checkout rs
 cd flowmodus-rs
-cargo test        # 14 passed（schema 往返 + 模块骨架）
+cargo test        # 83 passed（五层 + 三调用模式 + 控制面 + judge-points）
+cargo run -- judge "帮我探索这个主题"   # JP-1/JP-2 Rules 判定（0 tokens）
+cargo run -- measure "hello world 你好世界"  # STE（度）
+cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # canonical + sha256
 ```
 
-进度：R-1 骨架+schema ✅ → R-2 五层行为等价迁移（进行中）。
-文档：docs/VISION.md（v2.0-rs 宣言）、docs/DNA.md（不可变原则）、docs/PLAN.md、docs/GROWTH.md、docs/decisions/ADR-0100。
+进度：R-1 骨架 ✅ → R-2 五层 ✅ → R-3 三调用模式 ✅ → R-4 控制面+遥测 ✅ → R-5 judge-points 契约 ✅（R-6 文档链收口）。
+文档：docs/VISION.md（v2.0-rs 宣言）、docs/DNA.md（不可变原则）、docs/PLAN.md、docs/GROWTH.md、docs/decisions/ADR-0100、docs/engineering-manual/judge-points-contract.md（v1.1）。
