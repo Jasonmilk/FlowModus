@@ -29,6 +29,7 @@ pub mod health;
 
 /// Call-mode router — Manual / Group / Auto dispatch.
 pub mod router;
+pub mod serve_cmd;
 
 /// Layer 1: protocol & measure specification (STE standard token equivalent).
 pub mod layer1_normalize;
