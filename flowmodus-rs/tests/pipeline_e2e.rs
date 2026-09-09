@@ -103,7 +103,7 @@ fn run_pipeline(
         })
         .collect();
 
-    score_and_entropy_sample(&eligible_suppliers, "code-generation", instance_id, request_hash, &bias)
+    score_and_entropy_sample(&eligible_suppliers, "code-generation", instance_id, request_hash, &bias, &std::collections::HashSet::new())
 }
 
 #[test]
@@ -205,6 +205,6 @@ fn pipeline_bias_can_invert_choice() {
             ..Default::default()
         })
         .collect();
-    let d = score_and_entropy_sample(&eligible_suppliers, "code-generation", "inst", "req", &bias);
+    let d = score_and_entropy_sample(&eligible_suppliers, "code-generation", "inst", "req", &bias, &std::collections::HashSet::new());
     assert_eq!(d.supplier_id, "s2");
 }

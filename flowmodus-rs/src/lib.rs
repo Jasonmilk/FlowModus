@@ -18,6 +18,12 @@ pub mod pb {
 /// User bias configuration (migrated from Python v1.7 config/bias.py).
 pub mod config;
 
+/// Free/paid supplier registry store (度量衡注册台, 2026-09-09).
+pub mod registry;
+
+/// Supplier registry CLI subcommand (add/list/get/rm/test).
+pub mod supplier_cmd;
+
 /// Parasitic health tracker — failure cooldown + recovery (one-api semantics).
 pub mod health;
 

@@ -213,12 +213,19 @@ impl<'a> Router<'a> {
                 ..Default::default()
             })
             .collect();
+        let free_ids: std::collections::HashSet<String> = self
+            .registry
+            .iter()
+            .filter(|s| crate::registry::is_free_supplier(s))
+            .map(|s| s.supplier_id.clone())
+            .collect();
         score_and_entropy_sample(
             &eligible_suppliers,
             &normalized.agent_role,
             self.instance_id,
             &normalized.prompt_hash,
             self.bias,
+            &free_ids,
         )
     }
 }

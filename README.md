@@ -45,14 +45,40 @@ The rs branch is the deterministic rebuild: three call modes truly landed (Pytho
 git clone https://github.com/Jasonmilk/FlowModus.git
 cd FlowModus/flowmodus-rs
 
-cargo test        # 83 passed (five layers + three call modes + control plane + judge-points)
+cargo test        # 87 passed (five layers + three call modes + control plane + judge-points + registry)
 cargo run -- judge "帮我探索这个主题"            # JP-1/JP-2 Rules adjudication (0 tokens)
 cargo run -- measure "hello world 你好世界"      # STE (measure)
 cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # normalization + sha256 (verification)
 ```
 
-CLI commands: `judge` (judge-points Rules adjudication) / `measure` (STE) / `verify` (signature normalization).
+CLI commands: `judge` (judge-points Rules adjudication) / `measure` (STE) / `verify` (signature normalization) / `supplier` (registry management) / `route` (deterministic decision).
 Parsing uses std::env, no clap — minimal dependencies.
+
+## Supplier Registry (度量衡注册台)
+
+Free and paid suppliers are **physically separated** — one file per supplier:
+
+```
+registry/
+  free/<supplier_id>.json     # billing must be all-zero (enforced, physical fact)
+  paid/<supplier_id>.json     # any billing
+```
+
+```bash
+cargo run -- supplier add --tier free --id groq --base-url https://api.groq.com/openai/v1 \
+    --auth bearer_token --model llama-3.3-70b          # free tier rejects non-zero billing
+cargo run -- supplier list [--tier free|paid]
+cargo run -- supplier get --tier paid --id volc
+cargo run -- supplier test --tier free --id groq       # on-demand probe (0 idle probes)
+cargo run -- supplier rm --tier free --id groq
+cargo run -- route --model auto --prompt "hello"       # free-first soft priority
+```
+
+- Registered JSON files are **user-local** (gitignored — endpoints/keys stay out of the repo).
+- `route --model auto` applies the free-tier soft bonus in Layer 5 (0-token-first
+  survival philosophy); paid suppliers remain the fallback. Judgement stays with
+  the user — `free_tier_bonus` in `BiasConfig` is overridable.
+- Call modes: `auto` (five-layer pipeline) / `group:NAME` / explicit `MODEL_ID`.
 
 ## Five-Layer Deterministic Pipeline
 

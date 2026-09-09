@@ -63,12 +63,15 @@ pub fn weighted_sample<'a, T>(
 }
 
 /// Score candidates and perform entropy-weighted routing (pure).
+/// `free_ids`: suppliers whose billing is all-zero (physical fact) — they
+/// get the user-configured soft bonus (0 tokens first, 2026-09-09).
 pub fn score_and_entropy_sample(
     candidates: &[EligibleSupplier],
     agent_role: &str,
     instance_id: &str,
     request_hash: &str,
     bias_config: &BiasConfig,
+    free_ids: &std::collections::HashSet<String>,
 ) -> RoutingDecision {
     assert!(!candidates.is_empty(), "at least one candidate is required");
 
@@ -78,6 +81,9 @@ pub fn score_and_entropy_sample(
             let mut score = c.score as f64;
             if let Some(bias) = bias_config.supplier_biases.get(&c.supplier_id) {
                 score += bias.bias_score;
+            }
+            if free_ids.contains(&c.supplier_id) {
+                score += bias_config.free_tier_bonus;
             }
             if !agent_role.is_empty() && c.model_id.to_lowercase().contains(agent_role) {
                 score += 10.0;
@@ -166,9 +172,9 @@ mod tests {
             eligible("t3", "model3", 80.0, "http://t3"),
         ];
         let bias = BiasConfig::default();
-        let first = score_and_entropy_sample(&candidates, "default", "fixed-instance", "req-123", &bias);
+        let first = score_and_entropy_sample(&candidates, "default", "fixed-instance", "req-123", &bias, &std::collections::HashSet::new());
         for _ in 0..100 {
-            let d = score_and_entropy_sample(&candidates, "default", "fixed-instance", "req-123", &bias);
+            let d = score_and_entropy_sample(&candidates, "default", "fixed-instance", "req-123", &bias, &std::collections::HashSet::new());
             assert_eq!(d.supplier_id, first.supplier_id);
         }
     }
@@ -189,6 +195,7 @@ mod tests {
                 &format!("test-instance-{i}"),
                 "req-456",
                 &bias,
+                &std::collections::HashSet::new(),
             );
             seen.insert(d.supplier_id);
         }
@@ -204,7 +211,7 @@ mod tests {
             eligible("t2", "other", 90.0, "http://t2"),
         ];
         let bias = BiasConfig::default();
-        let d = score_and_entropy_sample(&candidates, "code", "i", "r", &bias);
+        let d = score_and_entropy_sample(&candidates, "code", "i", "r", &bias, &std::collections::HashSet::new());
         assert_eq!(d.supplier_id, "t1");
     }
 
@@ -212,7 +219,7 @@ mod tests {
     fn kv_cache_defaults_from_protocol() {
         let mut c = eligible("t1", "m1", 1.0, "http://t1");
         c.cost.as_mut().unwrap().kv_cache_applicable = true;
-        let d = score_and_entropy_sample(&[c], "", "i", "r", &BiasConfig::default());
+        let d = score_and_entropy_sample(&[c], "", "i", "r", &BiasConfig::default(), &std::collections::HashSet::new());
         assert_eq!(d.kv_cache_parameter, "cache_control");
         assert_eq!(d.kv_cache_ttl, 300);
     }

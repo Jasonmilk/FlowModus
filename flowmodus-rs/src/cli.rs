@@ -5,6 +5,7 @@
 //! - `measure <text>`  STE (度) — standard token equivalent
 //! - `verify <json>`   registry verification (检定): canonicalize + Ed25519
 //!                     verify against the protocol root key
+//! - `supplier ...`    registry management: add/list/get/rm/test (free|paid)
 //!
 //! Parsing uses std::env only (no clap — minimal-deps iron law).
 
@@ -24,6 +25,7 @@ impl Cli {
             return 0;
         };
         match cmd.as_str() {
+            "supplier" => crate::supplier_cmd::run(&args[1..]),
             "judge" => {
                 let text = args[1..].join(" ");
                 if text.is_empty() {
@@ -81,10 +83,117 @@ impl Cli {
                     }
                 }
             }
+            "route" => {
+                return cmd_route(&args[1..]);
+            }
             other => {
                 eprintln!("unknown command: {other}");
                 2
             }
+        }
+    }
+}
+
+/// `route` — resolve a deterministic routing decision from the registry.
+/// Usage: flowmodus route [--model auto|group:NAME|MODEL_ID] [--prompt "..."]
+///        [--role ROLE] [--max-tokens N] [--budget USD]
+/// Free-first soft priority applies in Auto mode (度量衡 + 0-token-first).
+fn cmd_route(args: &[String]) -> i32 {
+    use crate::config::BiasConfig;
+    use crate::config::HealthConfig;
+    use crate::health::HealthTracker;
+    use crate::layer2_5_deviation::DeviationSnapshot;
+    use crate::pb::{RawRequest, UserConstraints};
+    use crate::registry::RegistryStore;
+    use crate::router::Router;
+    use std::collections::HashMap;
+
+    let mut model = String::new();
+    let mut prompt = String::new();
+    let mut role = String::new();
+    let mut max_tokens: i32 = 0;
+    let mut budget: f32 = 0.0;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--model" => {
+                i += 1;
+                model = args.get(i).cloned().unwrap_or_default();
+            }
+            "--prompt" => {
+                i += 1;
+                prompt = args.get(i).cloned().unwrap_or_default();
+            }
+            "--role" => {
+                i += 1;
+                role = args.get(i).cloned().unwrap_or_default();
+            }
+            "--max-tokens" => {
+                i += 1;
+                max_tokens = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(0);
+            }
+            "--budget" => {
+                i += 1;
+                budget = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let store = RegistryStore::at_root();
+    let (free, paid) = store.load_all();
+    let mut registry: Vec<crate::pb::SupplierDeclaration> = free;
+    registry.extend(paid);
+    if registry.is_empty() {
+        eprintln!("route: registry is empty — add suppliers first (flowmodus supplier add ...)");
+        return 2;
+    }
+
+    let request = RawRequest {
+        prompt,
+        agent_role: role,
+        cognitive_mode: model.clone(),
+        max_output_tokens: max_tokens,
+        extra_headers: HashMap::new(),
+    };
+    let constraints = UserConstraints {
+        max_cost_per_request_usd: budget,
+        require_regions: vec![],
+        require_modalities: vec![],
+        require_verified_supplier: false,
+        max_claim_deviation_tolerance: 0.0,
+    };
+    let health = HealthTracker::new(HealthConfig::default());
+    let tokenizer_ratios: HashMap<String, f64> = HashMap::new();
+    let bias = BiasConfig::default();
+    let deviation = DeviationSnapshot::default();
+    let router = Router::new(
+        &registry,
+        &tokenizer_ratios,
+        deviation,
+        &bias,
+        constraints,
+        &health,
+        "cli",
+        0,
+    );
+    match router.resolve(&request, &model) {
+        Ok(d) => {
+            println!(
+                "supplier={} model={} endpoint={} cost_usd={:.6} kv_param={} kv_ttl={}",
+                d.supplier_id,
+                d.model_id,
+                d.endpoint_url,
+                d.estimated_cost_usd,
+                d.kv_cache_parameter,
+                d.kv_cache_ttl
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("route: {e}");
+            2
         }
     }
 }

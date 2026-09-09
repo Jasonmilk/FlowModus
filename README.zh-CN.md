@@ -51,14 +51,38 @@ Unicode NFC 协议缺口（Python 只做 key 排序）。
 git clone https://github.com/Jasonmilk/FlowModus.git
 cd FlowModus/flowmodus-rs
 
-cargo test        # 83 passed（五层 + 三调用模式 + 控制面 + judge-points）
+cargo test        # 87 passed（五层 + 三调用模式 + 控制面 + judge-points + 注册台）
 cargo run -- judge "帮我探索这个主题"            # JP-1/JP-2 Rules 判定（0 tokens）
 cargo run -- measure "hello world 你好世界"      # STE（度）
 cargo run -- verify '{"version":"v2.0-alpha","suppliers":[]}'  # 规范化 + sha256（检定）
 ```
 
-CLI 命令：`judge`（判断点 Rules 判定）/ `measure`（STE）/ `verify`（签名规范化）。
+CLI 命令：`judge`（判断点 Rules 判定）/ `measure`（STE）/ `verify`（签名规范化）/ `supplier`（注册台管理）/ `route`（确定性决策）。
 解析用 std::env，无 clap——依赖极简。
+
+## 供应商注册台（度量衡注册台）
+
+免费与付费供应商**物理分离**——一供应商一文件：
+
+```
+registry/
+  free/<supplier_id>.json     # 计费必须全 0（强制，物理事实）
+  paid/<supplier_id>.json     # 任意计费
+```
+
+```bash
+cargo run -- supplier add --tier free --id groq --base-url https://api.groq.com/openai/v1 \
+    --auth bearer_token --model llama-3.3-70b          # free 层拒绝非零计费
+cargo run -- supplier list [--tier free|paid]
+cargo run -- supplier get --tier paid --id volc
+cargo run -- supplier test --tier free --id groq       # 显式按需探测（0 空闲探针）
+cargo run -- supplier rm --tier free --id groq
+cargo run -- route --model auto --prompt "hello"       # 免费优先软优先
+```
+
+- 注册的 JSON 文件为**用户本地**（gitignore——端点/密钥不进仓库）。
+- `route --model auto` 在 L5 施加免费层软加分（0 tokens 优先生存哲学）；付费供应商兜底。判断权属于用户——`BiasConfig.free_tier_bonus` 可覆盖。
+- 调用模式：`auto`（五层管线）/ `group:NAME` / 显式 `MODEL_ID`。
 
 ## 五层确定性管线
 
