@@ -140,3 +140,10 @@ cargo run -- route --model auto --prompt "hello"       # free-first soft priorit
 ---
 
 *Built with mathematical rigor by the FlowModus Community.*
+
+## 按需状态端点（检定台数据源）
+
+```bash
+flowmodus serve --port 60053   # GET /api/status → 双 tier 池 + route auto 决策
+```
+std HTTP/1.1 零新依赖；不 serve 不监听（按需加载）；不暴露任何 key。
