@@ -13,9 +13,9 @@
 | **R-1** | cargo 工程骨架 + schema 迁移（protobuf 继承） | `cargo build` + schema 测试 | ✅ 14 passed |
 | **R-2** | 五层流水线迁移（L1 STE / L2 注册表 / L2.5 偏移量 / L3 计价 / L4 过滤 / L5 打分） | 行为等价（测试向量对齐 Python） | ✅ 43 passed |
 | **R-3** | 三调用模式（Manual/Group/Auto）+ 失败冷却恢复 | 模式测试全绿 | ✅ 55 passed |
-| **R-4** | 控制面（verifier/anti-corruption）+ 遥测（寄生，零探测） | grep 无探测字面量 | ⏳ |
-| **R-5** | judge-points 契约打通（JP 升级链与调度语义对接） | JP-1/JP-2 可配 + 测试 | ⏳ |
-| **R-6** | 文档链 + 全量验证 + 推送 | README 可用 + 推 rs | ⏳ |
+| **R-4** | 控制面（verifier/anti-corruption）+ 遥测（寄生，零探测） | grep 无探测字面量 | ✅ 76 passed |
+| **R-5** | judge-points 契约打通（JP 升级链与调度语义对接） | JP-1/JP-2 可配 + 测试 | ✅ 83 passed |
+| **R-6** | 文档链 + 全量验证 + 推送 | README 可用 + 推 rs | ✅ 83 passed |
 | **R-7** | judge 判定面上 serve 面（`ADR-0102`）：`POST /api/judge` + `GET /api/judge/rules`，响应带 `rule_version` | T 表 7 项 + 消费方联调 | ⏳ Accepted 2026-09-15，T0 未做 |
 
 ## 二、R-1 骨架与 schema（依赖序）
