@@ -16,6 +16,7 @@
 | **R-4** | 控制面（verifier/anti-corruption）+ 遥测（寄生，零探测） | grep 无探测字面量 | ⏳ |
 | **R-5** | judge-points 契约打通（JP 升级链与调度语义对接） | JP-1/JP-2 可配 + 测试 | ⏳ |
 | **R-6** | 文档链 + 全量验证 + 推送 | README 可用 + 推 rs | ⏳ |
+| **R-7** | judge 判定面上 serve 面（`ADR-0102`）：`POST /api/judge` + `GET /api/judge/rules`，响应带 `rule_version` | T 表 7 项 + 消费方联调 | ⏳ Accepted 2026-09-15，T0 未做 |
 
 ## 二、R-1 骨架与 schema（依赖序）
 
@@ -59,6 +60,13 @@
   - 升级链信号（判据不满足 → 升级）与 layer4/5 对接
 - 与 Anaphase judge.rs 的端点语义对齐（OpenAI 兼容）
 
+**R-7（`ADR-0102`，Accepted 2026-09-15，T0 未做）** —— 判定面上 serve 面：
+
+- `POST /api/judge`（入参 `{input, rule_set}`）+ `GET /api/judge/rules`（返回当前阈值与 `rule_version`）
+- 响应体带 `rule_version` —— **config hash，不是阈值本身**；随证轨归档保证判定可复现
+- `set_read_timeout` 超时 / 请求体上限 → 413 / 绑定保持 `127.0.0.1` /
+  **判定面保持哑**（不在 Tuck 审计链上，审计由 Anaphase 写）
+- **顺序硬约束**：必先于 `anaphase:ADR-0039` 的 T2
 ## 七、边界（禁止清单）
 
 - ❌ 不建 UI/daemon/ORM/web 框架（DNA 铁律 6）
