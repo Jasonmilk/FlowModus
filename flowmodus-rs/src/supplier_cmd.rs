@@ -80,6 +80,9 @@ fn cmd_add(args: &HashMap<String, String>) -> Result<(), String> {
                 audio_sec: 0.0,
                 video_frame: 0.0,
                 free_quota_daily: 0,
+                // ADR-0103: empty means the flat rates above are the whole story.
+                rules: vec![],
+                allowances: vec![],
             }),
             kv_cache: None,
             capabilities: None,

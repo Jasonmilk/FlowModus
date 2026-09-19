@@ -29,11 +29,29 @@ impl Tier {
 }
 
 /// Physical truth: a supplier is free iff every model bills zero.
+///
+/// ADR-0103 added a rate card (`rules`) beside the flat rates, so "bills zero" has to
+/// cover both. Without the `rules` half, a declaration that expressed a non-zero price
+/// through the rate card would be judged free and would be admitted into `registry/free/`
+/// — which is exactly what the free/paid physical separation (ADR-0101 D1) exists to
+/// prevent.
+///
+/// An allowance is deliberately **not** consulted here: an allowance is a quota, not a
+/// price, so having one does not make a supplier paid (ADR-0103 D2).
+///
+/// Known gap, recorded rather than silently fixed: the flat half still checks only
+/// `token_input`/`token_output`, so a declaration with zero token rates and a non-zero
+/// `compute_ms`/`audio_sec`/`video_frame` is judged free. Closing that changes the
+/// verdict for existing declarations, so it needs its own decision.
 pub fn is_free_supplier(decl: &SupplierDeclaration) -> bool {
     decl.models.iter().all(|m| {
         m.billing
             .as_ref()
-            .map(|b| b.token_input == 0.0 && b.token_output == 0.0)
+            .map(|b| {
+                b.token_input == 0.0
+                    && b.token_output == 0.0
+                    && b.rules.iter().all(|r| r.price_per_unit == 0.0)
+            })
             .unwrap_or(true)
     })
 }
@@ -150,7 +168,10 @@ impl RegistryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pb::{BillingDeclaration, ModelDeclaration};
+    use crate::pb::{
+        AllowanceExhaustPolicy, BillingDeclaration, BillingUnit, FreeAllowance, ModelDeclaration,
+        RateRule,
+    };
 
     /// Minimal std-only temp dir (最小依赖铁律 — no tempfile crate).
     struct TmpDir(std::path::PathBuf);
@@ -221,6 +242,52 @@ mod tests {
         store.add(Tier::Free, &free_decl("groq")).unwrap();
         assert_eq!(store.load_tier(Tier::Free).len(), 1);
         assert!(store.load_tier(Tier::Paid).is_empty());
+    }
+
+    /// ADR-0103: a price expressed through the rate card must be just as disqualifying as
+    /// one expressed through the flat fields. Without this, a non-zero price could enter
+    /// `registry/free/` — the very thing the physical separation exists to prevent.
+    #[test]
+    fn free_tier_rejects_a_nonzero_rate_card() {
+        let dir = TmpDir::new();
+        let store = RegistryStore::new(&dir.0);
+        let mut decl = free_decl("ratecard-in-free");
+        decl.models[0]
+            .billing
+            .as_mut()
+            .unwrap()
+            .rules
+            .push(RateRule {
+                unit: BillingUnit::TokenInput as i32,
+                price_per_unit: 0.5,
+                ..RateRule::default()
+            });
+        let err = store.add(Tier::Free, &decl).unwrap_err();
+        assert!(err.contains("non-zero billing"), "{err}");
+    }
+
+    /// ADR-0103 D2: an allowance is a quota, not a price. Having one must not make a
+    /// supplier paid, or the free tier could not express its own purpose.
+    #[test]
+    fn an_allowance_does_not_make_a_supplier_paid() {
+        let dir = TmpDir::new();
+        let store = RegistryStore::new(&dir.0);
+        let mut decl = free_decl("quota-but-free");
+        decl.models[0]
+            .billing
+            .as_mut()
+            .unwrap()
+            .allowances
+            .push(FreeAllowance {
+                unit: BillingUnit::TokenInput as i32,
+                quantity: 1_000_000,
+                reset_minute_utc: 0,
+                reset_period_hours: 24,
+                on_exhaust: AllowanceExhaustPolicy::Refuse as i32,
+            });
+        store
+            .add(Tier::Free, &decl)
+            .expect("an allowance is a quota, not a price");
     }
 
     #[test]

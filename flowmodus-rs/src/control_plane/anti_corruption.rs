@@ -11,8 +11,8 @@
 
 use crate::pb::{
     BillingDeclaration, CapabilitiesDeclaration, ComplianceDeclaration, EndpointDeclaration,
-    KvCacheDeclaration, ModelDeclaration, RegistryPackage, StreamingDeclaration, SupplierDeclaration,
-    ToolCallingDeclaration,
+    FreeAllowance, KvCacheDeclaration, ModelDeclaration, RateRule, RegistryPackage,
+    StreamingDeclaration, SupplierDeclaration, TimeWindow, ToolCallingDeclaration, VolumeTier,
 };
 use serde_json::{Map, Value};
 
@@ -121,6 +121,77 @@ fn parse_billing(v: &Value) -> Result<BillingDeclaration, String> {
         audio_sec: get_f64(obj, "audio_sec")?.unwrap_or_default() as f32,
         video_frame: get_f64(obj, "video_frame")?.unwrap_or_default() as f32,
         free_quota_daily: get_i64(obj, "free_quota_daily")?.unwrap_or_default() as i32,
+        // ADR-0103. Absent => empty, which is exactly today's behaviour. Present but
+        // malformed => an error, never a silent skip: the free tier is enforced on the
+        // parsed declaration, so a rate card that failed to parse must not read as free.
+        rules: match get_object_array(obj, "rules")? {
+            None => Vec::new(),
+            Some(arr) => arr.iter().map(parse_rate_rule).collect::<Result<_, _>>()?,
+        },
+        allowances: match get_object_array(obj, "allowances")? {
+            None => Vec::new(),
+            Some(arr) => arr.iter().map(parse_free_allowance).collect::<Result<_, _>>()?,
+        },
+    })
+}
+
+/// Arrays of objects, for the ADR-0103 rate card.
+fn get_object_array<'a>(
+    obj: &'a Map<String, Value>,
+    key: &str,
+) -> Result<Option<&'a Vec<Value>>, String> {
+    match obj.get(key) {
+        None => Ok(None),
+        Some(Value::Array(arr)) => Ok(Some(arr)),
+        Some(_) => Err(format!("field '{key}' must be an array")),
+    }
+}
+
+fn parse_time_window(v: &Value) -> Result<TimeWindow, String> {
+    let obj = v.as_object().ok_or("time_window must be an object")?;
+    Ok(TimeWindow {
+        start_minute_utc: get_i64(obj, "start_minute_utc")?.unwrap_or_default() as i32,
+        end_minute_utc: get_i64(obj, "end_minute_utc")?.unwrap_or_default() as i32,
+        effective_from_unix: get_i64(obj, "effective_from_unix")?.unwrap_or_default(),
+        effective_until_unix: get_i64(obj, "effective_until_unix")?.unwrap_or_default(),
+    })
+}
+
+fn parse_volume_tier(v: &Value) -> Result<VolumeTier, String> {
+    let obj = v.as_object().ok_or("tier must be an object")?;
+    Ok(VolumeTier {
+        from_units: get_i64(obj, "from_units")?.unwrap_or_default(),
+        to_units: get_i64(obj, "to_units")?.unwrap_or_default(),
+        price_per_unit: get_f64(obj, "price_per_unit")?.unwrap_or_default() as f32,
+    })
+}
+
+fn parse_rate_rule(v: &Value) -> Result<RateRule, String> {
+    let obj = v.as_object().ok_or("rate rule must be an object")?;
+    Ok(RateRule {
+        unit: get_i64(obj, "unit")?.unwrap_or_default() as i32,
+        price_per_unit: get_f64(obj, "price_per_unit")?.unwrap_or_default() as f32,
+        mode: get_i64(obj, "mode")?.unwrap_or_default() as i32,
+        window: match obj.get("window") {
+            None => None,
+            Some(w) => Some(parse_time_window(w)?),
+        },
+        window_multiplier: get_f64(obj, "window_multiplier")?.unwrap_or_default() as f32,
+        tiers: match get_object_array(obj, "tiers")? {
+            None => Vec::new(),
+            Some(arr) => arr.iter().map(parse_volume_tier).collect::<Result<_, _>>()?,
+        },
+    })
+}
+
+fn parse_free_allowance(v: &Value) -> Result<FreeAllowance, String> {
+    let obj = v.as_object().ok_or("allowance must be an object")?;
+    Ok(FreeAllowance {
+        unit: get_i64(obj, "unit")?.unwrap_or_default() as i32,
+        quantity: get_i64(obj, "quantity")?.unwrap_or_default(),
+        reset_minute_utc: get_i64(obj, "reset_minute_utc")?.unwrap_or_default() as i32,
+        reset_period_hours: get_i64(obj, "reset_period_hours")?.unwrap_or_default() as i32,
+        on_exhaust: get_i64(obj, "on_exhaust")?.unwrap_or_default() as i32,
     })
 }
 
@@ -326,5 +397,54 @@ mod tests {
         assert_eq!(pkg.version, "");
         assert!(pkg.suppliers.is_empty());
         assert!(pkg.signatures.is_empty());
+    }
+
+    /// ADR-0103: the rate card must survive the round trip with its numbers intact. A
+    /// parser that produced empty lists would leave a priced declaration looking free,
+    /// which is the one reading that must never happen by accident.
+    #[test]
+    fn parse_rate_card_and_allowance() {
+        let b = parse_billing(&serde_json::json!({
+            "currency": "USD",
+            "rules": [
+                {"unit": 1, "price_per_unit": 0.55,
+                 "window": {"start_minute_utc": 990, "end_minute_utc": 1500},
+                 "window_multiplier": 2.0,
+                 "tiers": [{"from_units": 0, "to_units": 1000000, "price_per_unit": 0.55},
+                           {"from_units": 1000000, "to_units": 0, "price_per_unit": 0.28}]},
+                {"unit": 2, "price_per_unit": 2.19}
+            ],
+            "allowances": [{"unit": 1, "quantity": 500000, "reset_minute_utc": 960,
+                            "reset_period_hours": 24, "on_exhaust": 1}]
+        }))
+        .unwrap();
+
+        assert_eq!(b.rules.len(), 2, "both rules must survive");
+        assert_eq!(b.rules[0].price_per_unit, 0.55);
+        assert_eq!(b.rules[0].window.as_ref().unwrap().start_minute_utc, 990);
+        assert_eq!(b.rules[0].window_multiplier, 2.0);
+        assert_eq!(b.rules[0].tiers.len(), 2);
+        assert_eq!(b.rules[0].tiers[1].price_per_unit, 0.28);
+        assert_eq!(
+            b.rules[1].tiers.len(),
+            0,
+            "an absent tier list is empty, not a fabricated default"
+        );
+        assert_eq!(b.allowances.len(), 1);
+        assert_eq!(b.allowances[0].quantity, 500_000);
+        assert_eq!(b.allowances[0].on_exhaust, 1);
+    }
+
+    /// Present-but-malformed is an **error**, not a skip: a rate card that silently failed
+    /// to parse would read as a free supplier, and the free tier is enforced on the parsed
+    /// declaration. Absent, by contrast, must stay today's behaviour.
+    #[test]
+    fn a_malformed_rate_card_is_an_error_not_a_skip() {
+        assert!(parse_billing(&serde_json::json!({"rules": "not an array"})).is_err());
+        assert!(parse_billing(&serde_json::json!({"rules": ["not an object"]})).is_err());
+        assert!(parse_billing(&serde_json::json!({"allowances": [{"quantity": "lots"}]})).is_err());
+
+        let absent = parse_billing(&serde_json::json!({"currency": "USD"})).unwrap();
+        assert!(absent.rules.is_empty() && absent.allowances.is_empty());
     }
 }

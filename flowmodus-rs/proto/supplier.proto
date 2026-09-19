@@ -32,7 +32,78 @@ message BillingDeclaration {
   float compute_ms = 4;
   float audio_sec = 5;
   float video_frame = 6;
+  // Superseded by `allowances` (ADR-0103 D2). Kept: removing a field is a different
+  // decision, and an old reader has to keep working.
   int32 free_quota_daily = 7;
+  // ADR-0103: a rate card is data, not per-supplier code. Both lists default to empty,
+  // and empty means the flat fields above are the whole story — so adding them changes
+  // no existing quote.
+  repeated RateRule rules = 8;
+  repeated FreeAllowance allowances = 9;
+}
+
+// ADR-0103 D1. 0 is "unspecified", so "absent" stays distinguishable from
+// "declared as ...". Value names are prefixed because every file shares package
+// `flowmodus`, where proto3 makes enum values package-scoped.
+enum BillingUnit {
+  BILLING_UNIT_UNSPECIFIED = 0;
+  BILLING_UNIT_TOKEN_INPUT = 1;
+  BILLING_UNIT_TOKEN_OUTPUT = 2;
+  BILLING_UNIT_CACHE_READ_TOKEN = 3;
+  BILLING_UNIT_CACHE_WRITE_TOKEN = 4;
+  BILLING_UNIT_COMPUTE_MS = 5;
+  BILLING_UNIT_AUDIO_SEC = 6;
+  BILLING_UNIT_VIDEO_FRAME = 7;
+  BILLING_UNIT_REQUEST = 8;
+}
+
+enum BillingMode {
+  BILLING_MODE_UNSPECIFIED = 0;
+  BILLING_MODE_REALTIME = 1;
+  BILLING_MODE_BATCH = 2;
+}
+
+// UTC and declared, so "the same instant prices the same everywhere" is decidable.
+// An absent window, or one with start == end, applies always.
+message TimeWindow {
+  int32 start_minute_utc = 1;
+  int32 end_minute_utc = 2;
+  int64 effective_from_unix = 3;
+  int64 effective_until_unix = 4;
+}
+
+message VolumeTier {
+  int64 from_units = 1;  // inclusive
+  int64 to_units = 2;    // exclusive; 0 = unbounded
+  float price_per_unit = 3;
+}
+
+// One line of a rate card. An unconditioned rule is exactly one entry of today's flat
+// table, so the flat fields are a special case rather than a parallel mechanism.
+message RateRule {
+  BillingUnit unit = 1;
+  float price_per_unit = 2;
+  BillingMode mode = 3;
+  TimeWindow window = 4;
+  // Peak/off-peak. 0 is treated as unspecified, i.e. neutral (1).
+  float window_multiplier = 5;
+  repeated VolumeTier tiers = 6;
+}
+
+// ADR-0103 D2: an allowance is NOT a price. It reduces the quantity before pricing, and
+// it never becomes a charge unless spillover is declared explicitly.
+enum AllowanceExhaustPolicy {
+  ALLOWANCE_EXHAUST_POLICY_UNSPECIFIED = 0;  // == REFUSE (the strict default)
+  ALLOWANCE_EXHAUST_POLICY_REFUSE = 1;
+  ALLOWANCE_EXHAUST_POLICY_SPILL_TO_PAID = 2;
+}
+
+message FreeAllowance {
+  BillingUnit unit = 1;
+  int64 quantity = 2;
+  int32 reset_minute_utc = 3;
+  int32 reset_period_hours = 4;  // 24 = daily; 0 = one-shot, never resets
+  AllowanceExhaustPolicy on_exhaust = 5;
 }
 
 message KvCacheDeclaration {
