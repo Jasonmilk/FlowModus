@@ -134,7 +134,7 @@ cargo run -- route --model auto --prompt "hello"       # free-first soft priorit
 - **NOTICE**: Apache attribution statement (see repository root)
 - **Defensive publication**: core innovations publicly disclosed via `docs/prior-art.md` +
   GitHub public git history as of 2026-09-06 (prior art), preventing third-party patent scooping
-- Reference inspiration (not borrowing): one-api / EchoBird (display & API management forms) —
+- Reference inspiration (not borrowing): mature third-party API management projects (display & API management forms) —
   explicitly rejects gateway / proxy / admin-console forms; no wheel reinvention
 
 ---

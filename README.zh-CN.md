@@ -139,7 +139,7 @@ cargo run -- route --model auto --prompt "hello"       # 免费优先软优先
 - **NOTICE**：Apache 归属声明（见仓库根目录）
 - **防御性公开**：核心创新点已在 `docs/prior-art.md` + GitHub 公开 git 历史
   构成 2026-09-06 的公开披露（prior art），防止第三方抢注专利
-- 参考灵感（非借用）：one-api / EchoBird（展示与管理 API 形态）——
+- 参考灵感（非借用）：成熟的第三方 API 管理项目（展示与管理 API 形态）——
   明确拒绝网关 / 代理 / 管理台形态，不重复造轮子
 
 ---

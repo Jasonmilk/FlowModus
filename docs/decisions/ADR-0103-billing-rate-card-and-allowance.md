@@ -184,22 +184,24 @@ FlowModus 暴露一个**带版本号**的投影，Cellrix 负责显示；FlowMod
 
 ---
 
-## 4. 参考实现的核对：EchoBird（2026-09-20，**clone 后读源码**）
+## 4. 参考实现的核对：一个第三方模型管理客户端（2026-09-20，**读源码而非市场文案**）
 
-> 用户点名参考 [EchoBird](https://github.com/edison7009/EchoBird)。**已 clone 并读源码**，
-> 不是只读市场文案。**取数方式**：`git clone --depth 1 https://github.com/edison7009/EchoBird`（36 MB）。
-> ⚠️ 说明：本机 DNS 把域名解析到 `198.18.0.0/15`（代理的 fake-IP 模式），所以 `web_fetch` 拒读
-> （非公网 IP 护栏），但 **`git` / `curl` 走代理是通的** ⇒ **引用因此可核**。
+> **⚠️ 本节不写它的名字** —— 本仓规则：**活文档不出现外部项目名**。
+> 需要核实时，**下引的类型定义与字段名都是逐字抄录的，可按内容检索**；身份不在此文件里承载。
+> **取数方式**：对该参考实现做 `--depth 1` 浅克隆（36 MB）后逐文件读，缓存放在工作区之外。
+> **顺带记一条本机网络事实**（它曾让几轮引用无法核验）：DNS 把域名解析到 `198.18.0.0/15`
+> （保留段，代理的 fake-IP 模式），所以 `web_fetch` 一律拒读（非公网 IP 护栏）；
+> 但 **`git` / `curl` 走代理是通的** ⇒ **引用可核，且已在别处据此更正了三处**。
 
 ### 4.1 它**是**什么的参考（三条，逐条有据）
 
-**(1) 免费额度的分类 —— 本 ADR 的 D2 缺一维。** `src/api/freeModels.ts`：
+**(1) 免费额度的分类 —— 本 ADR 的 D2 缺一维。** 其 `api/freeModels.ts`：
 
 ```ts
 export type FreeModelType = 'perpetual' | 'renewing-quota' | 'recurring-credit' | 'trial-credit';
 ```
 
-| EchoBird 的类型 | 本 ADR 的 `FreeAllowance` 能表达吗 |
+| 它的类型 | 本 ADR 的 `FreeAllowance` 能表达吗 |
 |---|---|
 | `renewing-quota`（周期性配额） | ✅ `reset_period_hours = 24` |
 | `trial-credit`（一次性） | ✅ `reset_period_hours = 0` |
@@ -209,28 +211,29 @@ export type FreeModelType = 'perpetual' | 'renewing-quota' | 'recurring-credit' 
 **⇒ 这正是用户说的"分离一个免费额度分类"。** D2 必须补 `perpetual` 与 `credit` 两种形态，
 否则把一家"每月送 $5 信用"的供应商硬塞进"每月送 N token"的模型里，**比较会算错，而错得不可见**。
 
-**(2) 与计费无关、但决定"这条路能不能走"的事实。** `FreeModelEntry` 还带
+**(2) 与计费无关、但决定"这条路能不能走"的事实。** 它的免费条目还带
 `cardRequired` · `phoneRequired` · `commercialOk`（可空布尔）· `verifiedAt`。
 **这不是计费，是资格与合规** —— 但它们同样是**声明**，同样需要"何时核验过"的时间戳。
 **⇒ 归供应商声明，不归 `BillingDeclaration`**（单一职责，别把两种事实混成一张表）。
 
-**(3) 版本化目录本身就是声明。** `FreeModelDirectory { version, updatedAt, models[] }`
-—— 带版本号与更新时间的声明，与 D2 的"确定性进签名声明"是同一形状。**旁证，不是新决定。**
+**(3) 版本化目录本身就是声明。** 它的目录结构是
+`{ version, updatedAt, models[] }` —— 带版本号与更新时间的声明，
+与 D2 的"确定性进签名声明"是同一形状。**旁证，不是新决定。**
 
 ### 4.2 它**不是**什么的参考（这条必须说清）
 
-**EchoBird 没有调度算法。** 实测：`src/` 与 `src-tauri/src/` 搜
+**它没有调度算法。** 实测：在其前端与 Rust 侧搜
 `weight|priority|fallback|load-balanc|round-robin|routing`，去掉 CSS 的 `font-weight` 之后，
-**只剩免费模型列表的优先级徽章**（`src/i18n/zh-Hans.ts` 的 `freeModels.router.priority`，
-与 `src/pages/FreeModels/FreeModels.tsx` 里那个可拖拽、带数字徽章的有序列表）。
+**只剩免费模型列表的优先级徽章**（一个 i18n 键 `freeModels.router.priority`，
+与一个可拖拽、带数字徽章的有序列表组件）。
 
 **⇒ 它的 "router" 是"把免费模型排个序"，不是评分/采样/降级。**
 而 FlowModus **已经有**更多：softmax + 确定性加权采样 + 降级/康复（`layer5_score.rs` / `layer4_filter.rs`）。
-**⇒ "参考 EchoBird 补调度逻辑"这一条不成立；它能补的是"排序交互"与"覆盖面"。**
+**⇒ "参考它补调度逻辑"这一条不成立；它能补的是"排序交互"与"覆盖面"。**
 
 ### 4.3 一条交互形态上的收获
 
-EchoBird 的用户偏好表达是**有序列表 + 整数优先级（拖拽即改）**，**不是自由浮点权重**。
+它的用户偏好表达是**有序列表 + 整数优先级（拖拽即改）**，**不是自由浮点权重**。
 
 **⇒ 这支持一件事**：把**整数优先级 + 显式顺序**作为**面向用户的主控件**，
 `bias_score: f64` 留作**细调**层。理由是可解释性 —— 用户能说清"我把它排第 3"，
@@ -238,12 +241,12 @@ EchoBird 的用户偏好表达是**有序列表 + 整数优先级（拖拽即改
 
 ### 4.4 结论
 
-| EchoBird 的元素 | 处置 |
+| 它的元素 | 处置 |
 |---|---|
 | 免费额度四分类 | ✅ **吸收** —— 补 D2 缺的那一维 |
 | `cardRequired` / `phoneRequired` / `commercialOk` / `verifiedAt` | ✅ **吸收**，归供应商声明，**不归计费** |
 | 版本化目录 | ✅ 旁证（与 D2 一致） |
-| **供应商面覆盖清单**（那串 CLI / 桌面客户端） | ✅ **吸收** —— 作为"要适配哪些供应商面"的依据 |
+| **供应商面覆盖清单** | ✅ **吸收** —— 作为"要适配哪些供应商面"的依据 |
 | 整数优先级 + 拖拽排序 | ✅ **吸收为交互形态** |
 | 调度算法 | ❌ **它没有**；FlowModus 已有的更强 |
 | 它的 UI 本身 | ❌ 归消费者（`ADR-0101`：不做又一个管理台） |
