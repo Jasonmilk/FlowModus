@@ -59,7 +59,8 @@ registry/
 ## 3. 明确不做（一期）
 
 - 不做 gRPC 服务端（FlowModus proto 的 Reason 服务、anaphase 接入、UI 检定台
-  Model Nexus 式界面 → 二期，与 Helix 生态适配一起）。
+  集中式模型枢纽界面 → 二期，与 Helix 生态适配一起；**该范式取自外部参考，
+  只用其"一处配置、多处生效"的思路，不沿用其界面命名**）。
 - 不持有凭证、不代理流量（拓扑不变：Anaphase → FlowModus(决策) → Tuck(唯一门)）。
 
 ## 4. 后果
