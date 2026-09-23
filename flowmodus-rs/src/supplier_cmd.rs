@@ -3,11 +3,16 @@
 //!
 //! Usage:
 //!   flowmodus supplier add --tier free --id groq --base-url https://... \
-//!       --auth bearer_token --model llama-3.3-70b [--in 0 --out 0] [--name ...]
+//!       --auth bearer_token --model llama-3.3-70b [--in 0 --out 0] [--name ...] [--api-key sk-...]
 //!   flowmodus supplier list [--tier free|paid]
 //!   flowmodus supplier get --tier free --id groq
 //!   flowmodus supplier rm --tier free --id groq
 //!   flowmodus supplier test --tier free --id groq   (on-demand probe, 0 idle probes)
+//!
+//! `--api-key` writes into the **secrets store** (`registry/.secrets/`, mode
+//! 600, git-ignored) — never into the declaration JSON, and never echoed by
+//! `list`/`get` (only `set`/`unset` is shown). Same store the panel's
+//! `POST /api/suppliers` writes to: one source, two front doors (唯一事实来源).
 
 use crate::pb::{BillingDeclaration, EndpointDeclaration, ModelDeclaration, SupplierDeclaration};
 use crate::registry::{is_free_supplier, RegistryStore, Tier};
@@ -105,8 +110,12 @@ fn cmd_add(args: &HashMap<String, String>) -> Result<(), String> {
 
     let store = RegistryStore::at_root();
     store.add(tier, &decl)?;
+    if let Some(key) = args.get("api-key").filter(|v| !v.is_empty()) {
+        store.set_api_key(tier, &decl.supplier_id, key)?;
+    }
     println!("registered {} -> registry/{}/{}.json", decl.supplier_id, tier.dir(), decl.supplier_id);
     println!("free={} (physical truth: all models zero billing)", is_free_supplier(&decl));
+    println!("api_key={}", if store.has_api_key(tier, &decl.supplier_id) { "set" } else { "unset" });
     Ok(())
 }
 
@@ -135,7 +144,8 @@ fn print_tier(store: &RegistryStore, tier: Tier) {
     println!("== {} ({}) ==", tier.as_str(), decls.len());
     for d in decls {
         let models: Vec<&str> = d.models.iter().map(|m| m.model_id.as_str()).collect();
-        println!("  {} [{}] models={}", d.supplier_id, d.supplier_name, models.join(","));
+        let key = if store.has_api_key(tier, &d.supplier_id) { "key=set" } else { "key=unset" };
+        println!("  {} [{}] models={} {}", d.supplier_id, d.supplier_name, models.join(","), key);
     }
 }
 
@@ -146,6 +156,7 @@ fn cmd_get(args: &HashMap<String, String>) -> Result<(), String> {
     match store.get(tier, &id) {
         Some(d) => {
             println!("{}", serde_json::to_string_pretty(&d).map_err(|e| e.to_string())?);
+            println!("api_key={}", if store.has_api_key(tier, &id) { "set (存于 registry/.secrets/，不在本声明中)" } else { "unset" });
             Ok(())
         }
         None => Err(format!("not found: tier={} id={id}", tier.as_str())),

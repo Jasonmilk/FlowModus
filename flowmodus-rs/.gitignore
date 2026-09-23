@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 registry/free/*.json
 registry/paid/*.json
+
+# 供应商 API key：机密，绝不入库（与声明文件分离，权限 600）
+registry/.secrets/

@@ -9,7 +9,7 @@ use crate::config::{BiasConfig, HealthConfig};
 use crate::health::HealthTracker;
 use crate::layer2_5_deviation::DeviationSnapshot;
 use crate::pb::{RawRequest, UserConstraints};
-use crate::registry::RegistryStore;
+use crate::registry::{RegistryStore, Tier};
 use crate::router::Router;
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -59,21 +59,58 @@ pub fn cmd_serve(args: &[String]) -> i32 {
 }
 
 fn handle(stream: &mut std::net::TcpStream) -> std::io::Result<()> {
-    let mut buf = [0u8; 2048];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let req = String::from_utf8_lossy(&buf[..n]);
+    // Read the full request: headers first, then the body up to
+    // Content-Length (a supplier declaration can exceed one 2 KiB chunk).
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let n = stream.read(&mut chunk)?;
+    buf.extend_from_slice(&chunk[..n]);
+    let head_end = buf.windows(4).position(|w| w == b"\r\n\r\n");
+    let headers = String::from_utf8_lossy(&buf[..head_end.unwrap_or(buf.len())]);
+    let mut content_len = 0usize;
+    for line in headers.lines() {
+        if let Some(v) = line.strip_prefix("Content-Length:") {
+            content_len = v.trim().parse().unwrap_or(0);
+        }
+    }
+    let body_off = head_end.map(|i| i + 4).unwrap_or(buf.len());
+    while buf.len() - body_off < content_len {
+        let m = stream.read(&mut chunk)?;
+        if m == 0 { break; }
+        buf.extend_from_slice(&chunk[..m]);
+    }
+
+    let req = String::from_utf8_lossy(&buf);
     let mut lines = req.lines();
     let request_line = lines.next().unwrap_or("");
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
-    let path = parts.next().unwrap_or("/");
+    let raw_path = parts.next().unwrap_or("/");
+    let path = raw_path.split('?').next().unwrap_or(raw_path);
+    let query = raw_path.split('?').nth(1).unwrap_or("");
+    let body = req[body_off.min(req.len())..].to_string();
 
     let (status, body) = if method == "GET" && path == "/healthz" {
         (200, r#"{"ok":true}"#.to_string())
     } else if method == "GET" && path == "/api/status" {
         match build_status() {
             Ok(b) => (200, b),
-            Err(e) => (500, format!(r#"{{"error":{}}}"#, serde_json::json!(e))),
+            Err(e) => (500, err_json(e)),
+        }
+    } else if method == "GET" && path == "/api/suppliers" {
+        match build_suppliers() {
+            Ok(b) => (200, b),
+            Err(e) => (500, err_json(e)),
+        }
+    } else if method == "POST" && path == "/api/suppliers" {
+        match add_supplier(&body) {
+            Ok(b) => (200, b),
+            Err(e) => (400, err_json(e)),
+        }
+    } else if method == "DELETE" && path == "/api/suppliers" {
+        match remove_supplier(query) {
+            Ok(b) => (200, b),
+            Err(e) => (400, err_json(e)),
         }
     } else {
         (404, r#"{"error":{"type":"not_found"}}"#.to_string())
@@ -86,6 +123,142 @@ fn handle(stream: &mut std::net::TcpStream) -> std::io::Result<()> {
         body
     );
     stream.write_all(resp.as_bytes())
+}
+
+fn err_json(e: String) -> String {
+    serde_json::json!({ "error": e }).to_string()
+}
+
+/* ---------- Supplier management endpoints (面板配置入口) ---------- */
+
+/// Body contract of `POST /api/suppliers` (面板 ↔ flowmodus 的唯一契约):
+/// a minimal declaration + optional API key. The key is stored apart (secrets
+/// store), never inside the declaration file.
+#[derive(serde::Deserialize)]
+struct SupplierIn {
+    tier: String,
+    supplier_id: String,
+    supplier_name: Option<String>,
+    base_url: String,
+    models: Vec<String>,
+    api_key: Option<String>,
+}
+
+fn add_supplier(payload: &str) -> Result<String, String> {
+    let input: SupplierIn =
+        serde_json::from_str(payload).map_err(|e| format!("bad body: {e}"))?;
+    let tier = match input.tier.as_str() {
+        "free" => Tier::Free,
+        "paid" => Tier::Paid,
+        other => return Err(format!("unknown tier {other:?} (free|paid)")),
+    };
+    if input.supplier_id.trim().is_empty() {
+        return Err("supplier_id is required".into());
+    }
+    if input.base_url.trim().is_empty() {
+        return Err("base_url is required".into());
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let name = input
+        .supplier_name
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| input.supplier_id.clone());
+    let decl = crate::pb::SupplierDeclaration {
+        supplier_id: input.supplier_id.clone(),
+        supplier_name: name,
+        verified: false,
+        updated_at_unix: now,
+        models: input
+            .models
+            .iter()
+            .filter(|m| !m.trim().is_empty())
+            .map(|m| crate::pb::ModelDeclaration {
+                model_id: m.clone(),
+                display_name: m.clone(),
+                lang: "en".into(),
+                semantic_tags: vec![],
+                agent_roles: vec![],
+                billing: Some(crate::pb::BillingDeclaration::default()),
+                kv_cache: None,
+                capabilities: None,
+                tokenizer_compression_ratio: 0.0,
+                capability_tags: vec![],
+            })
+            .collect(),
+        endpoints: vec![crate::pb::EndpointDeclaration {
+            r#type: "openai".into(),
+            region: String::new(),
+            base_url: input.base_url.clone(),
+            tls_version: String::new(),
+            auth_method: "bearer_token".into(),
+            priority: 1,
+            provision_url: String::new(),
+            documentation_url: String::new(),
+        }],
+        compliance: None,
+        rate_limits: None,
+    };
+    let store = RegistryStore::at_root();
+    store.add(tier, &decl)?;
+    if let Some(k) = input.api_key {
+        if !k.trim().is_empty() {
+            store.set_api_key(tier, &decl.supplier_id, k.trim())?;
+        }
+    }
+    Ok(serde_json::json!({
+        "ok": true,
+        "supplier_id": decl.supplier_id,
+        "tier": tier.as_str(),
+        "api_key_set": store.has_api_key(tier, &decl.supplier_id),
+    })
+    .to_string())
+}
+
+fn build_suppliers() -> Result<String, String> {
+    let store = RegistryStore::at_root();
+    let (free, paid) = store.load_all();
+    let mut out = Vec::new();
+    for (tier, decls) in [(Tier::Free, free), (Tier::Paid, paid)] {
+        for d in decls {
+            out.push(serde_json::json!({
+                "supplier_id": d.supplier_id,
+                "supplier_name": d.supplier_name,
+                "tier": tier.as_str(),
+                "verified": d.verified,
+                "models": d.models.iter().map(|m| m.model_id.clone()).collect::<Vec<_>>(),
+                "base_url": d.endpoints.first().map(|e| e.base_url.clone()).unwrap_or_default(),
+                "updated_at_unix": d.updated_at_unix,
+                /* 打码：列表只暴露"有没有 key"，绝不回显明文（按需加载/0 硬编码） */
+                "api_key_set": store.has_api_key(tier, &d.supplier_id),
+            }));
+        }
+    }
+    Ok(serde_json::json!({ "suppliers": out }).to_string())
+}
+
+fn remove_supplier(query: &str) -> Result<String, String> {
+    let mut tier = None;
+    let mut id = None;
+    for kv in query.split('&') {
+        if let Some(v) = kv.strip_prefix("tier=") {
+            tier = Some(v.to_string());
+        } else if let Some(v) = kv.strip_prefix("id=") {
+            id = Some(v.to_string());
+        }
+    }
+    let tier = match tier.as_deref() {
+        Some("free") => Tier::Free,
+        Some("paid") => Tier::Paid,
+        _ => return Err("query needs tier=free|paid".into()),
+    };
+    let id = id.ok_or_else(|| "query needs id=<supplier_id>".to_string())?;
+    let store = RegistryStore::at_root();
+    store.remove(tier, &id)?;   // remove() 会一并清掉 .secrets
+    Ok(serde_json::json!({ "ok": true, "supplier_id": id, "tier": tier.as_str() }).to_string())
 }
 
 fn build_status() -> Result<String, String> {

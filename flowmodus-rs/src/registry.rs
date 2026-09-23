@@ -16,6 +16,18 @@ pub enum Tier {
     Paid,
 }
 
+/// Per-supplier secret (API key), stored apart from the declaration.
+///
+/// The declaration file is a physical-facts record (id, endpoints, billing)
+/// that may be shared or committed; the key is a **credential**, so it lives
+/// in its own file (`registry/.secrets/<tier>-<id>.json`, mode 600, directory
+/// git-ignored) — never inside the declaration JSON. Two files, two facts,
+/// one source each (唯一事实来源 / 单一职责).
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SupplierSecret {
+    api_key: String,
+}
+
 impl Tier {
     pub fn dir(self) -> &'static str {
         match self {
@@ -161,7 +173,61 @@ impl RegistryStore {
         if !path.exists() {
             return Err(format!("not found: tier={} id={id}", tier.as_str()));
         }
-        std::fs::remove_file(&path).map_err(|e| format!("remove: {e}"))
+        std::fs::remove_file(&path).map_err(|e| format!("remove: {e}"))?;
+        self.remove_secret(tier, id);
+        Ok(())
+    }
+
+    /* ---------- Secrets: API keys, apart from declarations ---------- */
+
+    fn secrets_dir(&self) -> PathBuf {
+        self.root.join(".secrets")
+    }
+
+    fn secret_path(&self, tier: Tier, id: &str) -> PathBuf {
+        self.secrets_dir().join(format!("{}-{}.json", tier.dir(), id))
+    }
+
+    /// Store (or replace) a supplier's API key. The directory is created with
+    /// mode 700 and the file with mode 600 — a credential must not be world-
+    /// readable next to declarations that are.
+    pub fn set_api_key(&self, tier: Tier, id: &str, key: &str) -> Result<(), String> {
+        let dir = self.secrets_dir();
+        std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        }
+        let text = serde_json::to_string_pretty(&SupplierSecret { api_key: key.to_string() })
+            .map_err(|e| format!("serialize secret: {e}"))?;
+        let path = self.secret_path(tier, id);
+        std::fs::write(&path, text).map_err(|e| format!("write secret: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        }
+        Ok(())
+    }
+
+    /// Read a supplier's API key, if one has been set. Never called on a hot
+    /// path and never echoed back by listing endpoints (按需加载).
+    pub fn api_key(&self, tier: Tier, id: &str) -> Option<String> {
+        std::fs::read_to_string(self.secret_path(tier, id))
+            .ok()
+            .and_then(|t| serde_json::from_str::<SupplierSecret>(&t).ok())
+            .map(|s| s.api_key)
+    }
+
+    /// Whether a key is set — the only fact listing endpoints may expose
+    /// (the key itself never leaves this store).
+    pub fn has_api_key(&self, tier: Tier, id: &str) -> bool {
+        self.api_key(tier, id).is_some()
+    }
+
+    fn remove_secret(&self, tier: Tier, id: &str) {
+        let _ = std::fs::remove_file(self.secret_path(tier, id));
     }
 }
 
@@ -307,5 +373,36 @@ mod tests {
         assert!(store.get(Tier::Paid, "volc").is_some());
         store.remove(Tier::Paid, "volc").unwrap();
         assert!(store.get(Tier::Paid, "volc").is_none());
+    }
+
+    #[test]
+    fn api_key_roundtrip_and_never_in_declaration() {
+        let dir = TmpDir::new();
+        let store = RegistryStore::new(&dir.0);
+        store.add(Tier::Paid, &paid_decl("deepseek")).unwrap();
+        assert!(!store.has_api_key(Tier::Paid, "deepseek"));
+
+        store.set_api_key(Tier::Paid, "deepseek", "sk-secret").unwrap();
+        assert!(store.has_api_key(Tier::Paid, "deepseek"));
+        assert_eq!(store.api_key(Tier::Paid, "deepseek").as_deref(), Some("sk-secret"));
+
+        // 单一来源：声明文件（物理事实）里绝不含 key —— key 只在 .secrets/。
+        let decl_text =
+            std::fs::read_to_string(store.file_path(Tier::Paid, "deepseek")).unwrap();
+        assert!(!decl_text.contains("sk-secret"), "key leaked into declaration");
+        let secret_text =
+            std::fs::read_to_string(store.secret_path(Tier::Paid, "deepseek")).unwrap();
+        assert!(secret_text.contains("sk-secret"), "secret file missing the key");
+    }
+
+    #[test]
+    fn remove_clears_secret_too() {
+        let dir = TmpDir::new();
+        let store = RegistryStore::new(&dir.0);
+        store.add(Tier::Paid, &paid_decl("deepseek")).unwrap();
+        store.set_api_key(Tier::Paid, "deepseek", "sk-secret").unwrap();
+        store.remove(Tier::Paid, "deepseek").unwrap();
+        assert!(!store.has_api_key(Tier::Paid, "deepseek"));
+        assert!(!store.secret_path(Tier::Paid, "deepseek").exists());
     }
 }
