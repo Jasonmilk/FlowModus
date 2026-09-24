@@ -179,7 +179,21 @@ impl FlowModus for ReasonService {
             max_output_tokens: max_tokens as i32,
             extra_headers: HashMap::new(),
         };
-        let decision = router.resolve(&raw, "").map_err(|e| {
+        /* The requested model is the caller's intent, and it was DROPPED here by
+         * being replaced with "" — measured 2026-09-24: anaphase declared
+         * `reasoning_model=mock-chat-1` (a registered free supplier answering from
+         * a local mock), the CLI resolved that model correctly
+         * (`supplier=mock-llm endpoint=http://127.0.0.1:59099/v1`), yet every turn
+         * called agnes-ai and died on 403, because the gRPC face always ran Auto.
+         * Two front doors, two answers — the same defect class this repo names
+         * 唯一事实来源.
+         *
+         * Passing it through cannot regress the "cognitive mode" case the comment
+         * above worries about: a bare word parses as a Group, and an UNKNOWN group
+         * already falls back to Auto (`router.rs` CallMode::Group). Empty stays
+         * Auto. So the router keeps its own precedence; this face stops erasing
+         * the caller's. */
+        let decision = router.resolve(&raw, &mode).map_err(|e| {
             Status::unavailable(format!("路由失败: {e}"))
         })?;
 
