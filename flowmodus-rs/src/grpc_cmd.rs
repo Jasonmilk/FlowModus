@@ -143,7 +143,14 @@ impl FlowModus for ReasonService {
         if prompt.is_empty() {
             return Err(Status::invalid_argument("prompt 为空"));
         }
-        let mode = req.model;
+        /* Two DIFFERENT facts, and they used to share one field. The wire field
+         * `model` is documented as the cognitive mode, and anaphase's adapter
+         * called its parameter `model` while passing `reasoning_mode` — so the
+         * model a caller declared never reached the router at all, and routing
+         * silently fell back to whatever Auto preferred (measured 2026-09-24:
+         * every turn called agnes-ai and died on 403 while a working free
+         * supplier sat registered). The proto now carries them separately. */
+        let mode = req.cognitive_mode;
         let max_tokens = if req.max_tokens == 0 { 2048 } else { req.max_tokens };
 
         // 1) registry → router（模板与 serve_cmd 同一套：纯物理事实）
@@ -171,7 +178,8 @@ impl FlowModus for ReasonService {
             0,
         );
 
-        // 2) 路由：认知模式是提示不是模型名 → 一律 Auto 管线
+        // 2) 路由：调用方**声明的模型**优先（`req.model`）；为空时才是 Auto。
+    //    认知模式（`req.cognitive_mode`）是提示，不参与选供应商。
         let raw = RawRequest {
             prompt: prompt.clone(),
             agent_role: Self::mode_to_role(&mode),
@@ -193,7 +201,7 @@ impl FlowModus for ReasonService {
          * already falls back to Auto (`router.rs` CallMode::Group). Empty stays
          * Auto. So the router keeps its own precedence; this face stops erasing
          * the caller's. */
-        let decision = router.resolve(&raw, &mode).map_err(|e| {
+        let decision = router.resolve(&raw, &req.model).map_err(|e| {
             Status::unavailable(format!("路由失败: {e}"))
         })?;
 
