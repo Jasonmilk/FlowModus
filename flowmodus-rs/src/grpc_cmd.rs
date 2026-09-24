@@ -229,6 +229,11 @@ impl FlowModus for ReasonService {
         Ok(Response::new(ReasonResponse {
             content,
             tokens_consumed: tokens,
+            /* The ROUTED model — `decision.model_id`, not `req.model`. ADR-0036
+             * asks for the fact that actually served the call; echoing the
+             * caller's request back would be a configured value standing in for a
+             * measured one (anaphase K-115). */
+            model: decision.model_id.clone(),
         }))
     }
 }
