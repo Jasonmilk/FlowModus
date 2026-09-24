@@ -12,6 +12,7 @@ serde_json = "1"
 sha2 = "0.10"
 ed25519-dalek = "2"
 unicode-normalization = "0.1"
+ureq = { version = "2", features = ["tls"] }
 
 [build-dependencies]
 prost-build = "0.13"

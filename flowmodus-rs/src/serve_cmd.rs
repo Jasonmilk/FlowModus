@@ -102,6 +102,11 @@ fn handle(stream: &mut std::net::TcpStream) -> std::io::Result<()> {
             Ok(b) => (200, b),
             Err(e) => (500, err_json(e)),
         }
+    } else if method == "POST" && path == "/api/suppliers/probe" {
+        match probe_models(&body) {
+            Ok(b) => (200, b),
+            Err(e) => (400, err_json(e)),
+        }
     } else if method == "POST" && path == "/api/suppliers" {
         match add_supplier(&body) {
             Ok(b) => (200, b),
@@ -142,6 +147,80 @@ struct SupplierIn {
     base_url: String,
     models: Vec<String>,
     api_key: Option<String>,
+    /// model_id → semantic_tags（面板打标签；缺省为空，兼容旧面板）
+    #[serde(default)]
+    model_tags: std::collections::HashMap<String, Vec<String>>,
+}
+
+/// Body contract of `POST /api/suppliers/probe`:
+/// 探测一个供应商的模型列表（OpenAI 兼容 /models）。key 只在 flowmodus 侧用于
+/// 出站请求，不落盘、不记录、不进入任何声明 —— 探测是纯候选，确认后写库的是
+/// 面板自己的 `POST /api/suppliers`。
+#[derive(serde::Deserialize)]
+struct ProbeIn {
+    base_url: String,
+    api_key: Option<String>,
+}
+
+/// 模型 id 列表 + 标签映射 → 声明里的模型项。纯函数（单一职责：标签与计费
+/// 默认值都在这里一次性确定，不散落在多处）。
+fn build_model_decls(
+    ids: &[String],
+    tags: &std::collections::HashMap<String, Vec<String>>,
+) -> Vec<crate::pb::ModelDeclaration> {
+    ids.iter()
+        .filter(|m| !m.trim().is_empty())
+        .map(|m| crate::pb::ModelDeclaration {
+            model_id: m.clone(),
+            display_name: m.clone(),
+            lang: "en".into(),
+            semantic_tags: tags.get(m).cloned().unwrap_or_default(),
+            agent_roles: vec![],
+            billing: Some(crate::pb::BillingDeclaration::default()),
+            kv_cache: None,
+            capabilities: None,
+            tokenizer_compression_ratio: 0.0,
+            capability_tags: vec![],
+        })
+        .collect()
+}
+
+/// 探测供应商的模型列表（OpenAI 兼容 /models）。失败给明确原因：
+/// 网络/HTTP 状态/形状不符都分开说，不猜。
+fn probe_models(payload: &str) -> Result<String, String> {
+    let input: ProbeIn =
+        serde_json::from_str(payload).map_err(|e| format!("bad body: {e}"))?;
+    let base = input.base_url.trim();
+    if base.is_empty() {
+        return Err("base_url is required".into());
+    }
+    let url = format!("{}/models", base.trim_end_matches('/'));
+    let mut req = ureq::get(&url).timeout(std::time::Duration::from_secs(8));
+    if let Some(k) = input.api_key.as_ref().filter(|k| !k.trim().is_empty()) {
+        req = req.set("Authorization", &format!("Bearer {}", k.trim()));
+    }
+    let resp = req
+        .call()
+        .map_err(|e| format!("探测失败：{e}（确认 base_url 与 key 正确，且端点兼容 OpenAI /models 协议）"))?;
+    let body = resp
+        .into_string()
+        .map_err(|e| format!("读取响应失败：{e}"))?;
+    let v: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("响应不是合法 JSON：{e}"))?;
+    let data = v
+        .get("data")
+        .and_then(|d| d.as_array())
+        .ok_or_else(|| "响应没有 data 数组（不是 OpenAI 兼容的 /models 形状）".to_string())?;
+    let mut models: Vec<String> = Vec::new();
+    for m in data {
+        if let Some(id) = m.get("id").and_then(|i| i.as_str()) {
+            models.push(id.to_string());
+        }
+    }
+    if models.is_empty() {
+        return Err("探测到了 0 个模型（该端点可能不是 OpenAI 兼容协议，请手动填写）".into());
+    }
+    Ok(serde_json::json!({ "models": models }).to_string())
 }
 
 fn add_supplier(payload: &str) -> Result<String, String> {
@@ -172,23 +251,7 @@ fn add_supplier(payload: &str) -> Result<String, String> {
         supplier_name: name,
         verified: false,
         updated_at_unix: now,
-        models: input
-            .models
-            .iter()
-            .filter(|m| !m.trim().is_empty())
-            .map(|m| crate::pb::ModelDeclaration {
-                model_id: m.clone(),
-                display_name: m.clone(),
-                lang: "en".into(),
-                semantic_tags: vec![],
-                agent_roles: vec![],
-                billing: Some(crate::pb::BillingDeclaration::default()),
-                kv_cache: None,
-                capabilities: None,
-                tokenizer_compression_ratio: 0.0,
-                capability_tags: vec![],
-            })
-            .collect(),
+        models: build_model_decls(&input.models, &input.model_tags),
         endpoints: vec![crate::pb::EndpointDeclaration {
             r#type: "openai".into(),
             region: String::new(),
@@ -230,6 +293,10 @@ fn build_suppliers() -> Result<String, String> {
                 "tier": tier.as_str(),
                 "verified": d.verified,
                 "models": d.models.iter().map(|m| m.model_id.clone()).collect::<Vec<_>>(),
+                /* 标签随模型一起暴露给面板详情（物理事实：标签是声明的一部分） */
+                "model_tags": d.models.iter().filter(|m| !m.semantic_tags.is_empty())
+                    .map(|m| (m.model_id.clone(), m.semantic_tags.clone()))
+                    .collect::<std::collections::HashMap<_, _>>(),
                 "base_url": d.endpoints.first().map(|e| e.base_url.clone()).unwrap_or_default(),
                 "updated_at_unix": d.updated_at_unix,
                 /* 打码：列表只暴露"有没有 key"，绝不回显明文（按需加载/0 硬编码） */
@@ -316,4 +383,38 @@ fn build_status() -> Result<String, String> {
         "current": decision,
     })
     .to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_model_decls_applies_tags_per_model() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let mut tags = HashMap::new();
+        tags.insert("a".to_string(), vec!["fast".to_string(), "reasoning".to_string()]);
+        let decls = build_model_decls(&ids, &tags);
+        assert_eq!(decls.len(), 2);
+        assert_eq!(decls[0].semantic_tags, vec!["fast", "reasoning"]);
+        assert!(decls[1].semantic_tags.is_empty());
+    }
+
+    #[test]
+    fn build_model_decls_filters_blank_ids_and_defaults_display() {
+        let ids = vec!["x".to_string(), "  ".to_string(), "".to_string()];
+        let decls = build_model_decls(&ids, &HashMap::new());
+        assert_eq!(decls.len(), 1);
+        assert_eq!(decls[0].model_id, "x");
+        assert_eq!(decls[0].display_name, "x");
+    }
+
+    #[test]
+    fn build_model_decls_unknown_tag_key_is_ignored() {
+        let ids = vec!["m".to_string()];
+        let mut tags = HashMap::new();
+        tags.insert("other".to_string(), vec!["t".to_string()]);
+        let decls = build_model_decls(&ids, &tags);
+        assert!(decls[0].semantic_tags.is_empty());
+    }
 }

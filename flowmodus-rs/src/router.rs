@@ -147,9 +147,9 @@ impl<'a> Router<'a> {
             CallMode::Group(name) => match self.group(&name) {
                 Some(d) => Ok(d),
                 // unknown/empty group falls back to Auto (Python stub shape)
-                None => Ok(self.auto(request)),
+                None => self.auto(request),
             },
-            CallMode::Auto => Ok(self.auto(request)),
+            CallMode::Auto => self.auto(request),
         }
     }
 
@@ -188,7 +188,7 @@ impl<'a> Router<'a> {
 
     /// Auto: the full five-layer deterministic pipeline
     /// (Python v1.7 `_auto_decision` shape, incl. score = 0.0 candidates).
-    pub fn auto(&self, request: &RawRequest) -> RoutingDecision {
+    pub fn auto(&self, request: &RawRequest) -> Result<RoutingDecision, String> {
         let normalized = normalize_request(request, self.tokenizer_ratios);
         let eligible = get_eligible_suppliers(self.registry, &normalized);
         let estimates = estimate_all(&normalized, &eligible, &self.deviation);
@@ -213,20 +213,23 @@ impl<'a> Router<'a> {
                 ..Default::default()
             })
             .collect();
+        if eligible_suppliers.is_empty() {
+            return Err("no eligible supplier candidates — 无可用模型候选（声明缺失 / 模型为空 / 硬过滤全灭），请先在面板配置供应商并声明模型".into());
+        }
         let free_ids: std::collections::HashSet<String> = self
             .registry
             .iter()
             .filter(|s| crate::registry::is_free_supplier(s))
             .map(|s| s.supplier_id.clone())
             .collect();
-        score_and_entropy_sample(
+        Ok(score_and_entropy_sample(
             &eligible_suppliers,
             &normalized.agent_role,
             self.instance_id,
             &normalized.prompt_hash,
             self.bias,
             &free_ids,
-        )
+        ))
     }
 }
 
@@ -326,6 +329,25 @@ mod tests {
         assert_eq!(d.model_id, "s1-fast");
         assert_eq!(d.endpoint_url, "https://s1.example/v1"); // trailing slash stripped
         assert_eq!(d.request_id, "s1-fast");
+    }
+
+    #[test]
+    fn auto_no_candidates_errors_not_panics() {
+        /* 有声明但 models 为空（或硬过滤全灭）时 auto 必须返回 Err，
+         * 绝不允许 panic —— /api/status 在空 registry 场景是"未配置"而不是崩溃。 */
+        let decl = pb::SupplierDeclaration {
+            supplier_id: "empty-models".into(),
+            models: vec![],
+            endpoints: vec![pb::EndpointDeclaration { base_url: "https://x.example/v1/".into(), ..Default::default() }],
+            ..Default::default()
+        };
+        let reg = vec![decl];
+        let ratios = default_ratios();
+        let bias = BiasConfig::default();
+        let health = HealthTracker::new(Default::default());
+        let r = router(&reg, &ratios, &bias, &health);
+        let err = r.resolve(&RawRequest::default(), "").expect_err("auto must error on empty candidates");
+        assert!(err.contains("no eligible"), "unexpected error: {err}");
     }
 
     #[test]
