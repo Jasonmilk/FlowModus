@@ -15,6 +15,11 @@ pub mod pb {
     include!(concat!(env!("OUT_DIR"), "/flowmodus.rs"));
 }
 
+/// gRPC Reason 契约（anaphase 调用 FlowModus 的 LLM 调度入口）。
+pub mod flowmodus_api {
+    include!(concat!(env!("OUT_DIR"), "/grpc/flowmodus.rs"));
+}
+
 /// User bias configuration (migrated from Python v1.7 config/bias.py).
 pub mod config;
 
@@ -30,6 +35,7 @@ pub mod health;
 /// Call-mode router — Manual / Group / Auto dispatch.
 pub mod router;
 pub mod serve_cmd;
+pub mod grpc_cmd;
 
 /// Layer 1: protocol & measure specification (STE standard token equivalent).
 pub mod layer1_normalize;

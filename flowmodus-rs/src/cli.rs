@@ -89,6 +89,9 @@ impl Cli {
             "serve" => {
                 return crate::serve_cmd::cmd_serve(&args[1..]);
             }
+            "grpc" => {
+                return crate::grpc_cmd::cmd_grpc(&args[1..]);
+            }
             other => {
                 eprintln!("unknown command: {other}");
                 2
