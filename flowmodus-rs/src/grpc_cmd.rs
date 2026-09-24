@@ -11,7 +11,7 @@
 
 use crate::config::BiasConfig;
 use crate::flowmodus_api::flow_modus_server::{FlowModus, FlowModusServer};
-use crate::flowmodus_api::{ReasonRequest, ReasonResponse};
+use crate::flowmodus_api::{ReasonRequest, ReasonResponse, Usage};
 use crate::health::HealthTracker;
 use crate::layer2_5_deviation::DeviationSnapshot;
 use crate::pb::{RawRequest, SupplierDeclaration, UserConstraints};
@@ -103,7 +103,7 @@ impl ReasonService {
         prompt: &str,
         max_tokens: u32,
         key: &str,
-    ) -> Result<(String, u32), String> {
+    ) -> Result<(String, Option<Usage>), String> {
         let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
         let body = serde_json::json!({
             "model": model,
@@ -127,8 +127,24 @@ impl ReasonService {
             .as_str()
             .unwrap_or("")
             .to_string();
-        let tokens = v["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
-        Ok((content, tokens))
+        /* Disjoint facts, or NOTHING. This used to read `usage.total_tokens` and
+         * hand back one number, which is lossy in exactly the way that made the
+         * metering leg unwireable: Anaphase stores a breakdown and refuses to
+         * rebuild one from a sum. Both counts must be reported, otherwise the
+         * honest answer is "no usage", not a zero-filled breakdown. */
+        let u = &v["usage"];
+        let usage = match (u["prompt_tokens"].as_u64(), u["completion_tokens"].as_u64()) {
+            (Some(prompt_tokens), Some(completion_tokens)) => Some(Usage {
+                prompt_tokens,
+                completion_tokens,
+                cached_tokens: u["prompt_tokens_details"]["cached_tokens"]
+                    .as_u64()
+                    .or_else(|| u["prompt_cache_hit_tokens"].as_u64()),
+                reasoning_tokens: u["completion_tokens_details"]["reasoning_tokens"].as_u64(),
+            }),
+            _ => None,
+        };
+        Ok((content, usage))
     }
 }
 
@@ -217,7 +233,7 @@ impl FlowModus for ReasonService {
                 decision.supplier_id, decision.supplier_id
             ))
         })?;
-        let (content, tokens) = Self::call_chat(
+        let (content, usage) = Self::call_chat(
             &decision.endpoint_url,
             &decision.model_id,
             &prompt,
@@ -228,7 +244,7 @@ impl FlowModus for ReasonService {
 
         Ok(Response::new(ReasonResponse {
             content,
-            tokens_consumed: tokens,
+            usage,
             /* The ROUTED model — `decision.model_id`, not `req.model`. ADR-0036
              * asks for the fact that actually served the call; echoing the
              * caller's request back would be a configured value standing in for a
