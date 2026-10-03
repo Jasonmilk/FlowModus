@@ -98,6 +98,62 @@ where
     Err(AllFailed { attempts: failures })
 }
 
+/// THE IO CLASSIFIERS, split from the call so each rule is testable without a socket.
+/// A status is 5xx (transient by convention) or "anything else" — and the else branch keeps the upstream
+/// BODY VERBATIM (§358.1: passing upstream's own words through, not inventing a friendlier sentence).
+pub fn classify_status(status: u16, body: &str) -> AttemptFailure {
+    if (500..600).contains(&status) {
+        AttemptFailure::Http5xx { status }
+    } else {
+        AttemptFailure::UpstreamStatus { status, body: body.to_string() }
+    }
+}
+
+/// A transport error is three DIFFERENT facts (§362.3 ②): the peer refused, the peer went silent, or we never
+/// reached it at all. Collapsing them is the mutation this function's criterion guards.
+pub fn classify_transport_kind(kind: std::io::ErrorKind) -> AttemptFailure {
+    use std::io::ErrorKind;
+    match kind {
+        ErrorKind::ConnectionRefused => AttemptFailure::Refused,
+        ErrorKind::TimedOut => AttemptFailure::Timeout,
+        _ => AttemptFailure::Unreachable,
+    }
+}
+
+/// The thin shell: `ureq` has exactly two shapes, and both are delegated to the rules above.
+/// (Not unit-tested directly: building a `ureq::Error::Status` needs a live `Response`. Its two branches are
+/// one line each and their rules ARE tested — `classify_status` and `classify_transport_kind`.)
+pub fn classify_ureq(err: &ureq::Error) -> AttemptFailure {
+    match err {
+        ureq::Error::Status(code, resp) => {
+            let body = resp.status_text().to_string();
+            classify_status(*code, &body)
+        }
+        ureq::Error::Transport(t) => classify_ureq_transport(t.kind(), t.message().unwrap_or("")),
+    }
+}
+
+/// `ureq::ErrorKind` is NOT `io::ErrorKind` (measured: the compiler refused the conversion), and it collapses
+/// several transport facts into `ConnectionFailed`. So the two facts this project needs to tell apart — the
+/// peer REFUSED, or the peer went SILENT — are recognised from ureq's own message, and that is a LIMITATION
+/// worth naming: it is string matching, so a wording change upstream could re-label an attempt.
+/// It cannot however merge the classes silently: the fallback is `Unreachable`, which is a THIRD name.
+pub fn classify_ureq_transport(kind: ureq::ErrorKind, message: &str) -> AttemptFailure {
+    let m = message.to_ascii_lowercase();
+    match kind {
+        ureq::ErrorKind::ConnectionFailed | ureq::ErrorKind::Io => {
+            if m.contains("refused") {
+                AttemptFailure::Refused
+            } else if m.contains("timed out") || m.contains("timeout") {
+                AttemptFailure::Timeout
+            } else {
+                AttemptFailure::Unreachable
+            }
+        }
+        _ => AttemptFailure::Unreachable,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,5 +239,53 @@ mod tests {
         .expect("the text candidate answers");
         assert_eq!(out, "body from text");
         assert_eq!(*tried.borrow(), vec!["text".to_string()], "the non-text candidate must not be tried");
+    }
+
+    /// THE IO CLASSIFIERS (ADR-0048 §362.3): a status is named, and the upstream body is passed through
+    /// VERBATIM. Mutation: "friendly" rewording of the body fails the equality below.
+    #[test]
+    fn statuses_are_classified_and_the_upstream_body_passes_through_verbatim() {
+        assert_eq!(classify_status(503, "boom"), AttemptFailure::Http5xx { status: 503 });
+        assert_eq!(classify_status(500, ""), AttemptFailure::Http5xx { status: 500 });
+        let upstream = "rate limit exceeded; retry after 30s";
+        assert_eq!(
+            classify_status(429, upstream),
+            AttemptFailure::UpstreamStatus { status: 429, body: upstream.to_string() },
+            "the supplier's own words must survive unchanged"
+        );
+        assert_eq!(classify_status(401, "invalid api key").name(), "upstream-status");
+    }
+
+    /// THREE TRANSPORT FACTS, THREE NAMES. Mutation: mapping `TimedOut` (or `ConnectionRefused`) onto
+    /// `Unreachable` makes the three names collide and this test fails.
+    #[test]
+    fn refused_silent_and_unreachable_are_three_facts() {
+        use std::io::ErrorKind;
+        assert_eq!(classify_transport_kind(ErrorKind::ConnectionRefused), AttemptFailure::Refused);
+        assert_eq!(classify_transport_kind(ErrorKind::TimedOut), AttemptFailure::Timeout);
+        assert_eq!(classify_transport_kind(ErrorKind::ConnectionReset), AttemptFailure::Unreachable);
+        let names = [
+            classify_transport_kind(ErrorKind::ConnectionRefused).name(),
+            classify_transport_kind(ErrorKind::TimedOut).name(),
+            classify_transport_kind(ErrorKind::ConnectionReset).name(),
+        ];
+        assert_eq!(names, ["refused", "timeout", "unreachable"]);
+    }
+
+    /// The ureq SHELL's rule, tested for what it can promise: the three names stay distinct and the
+    /// fallback is never a silent merge. (The message inspection itself is a named limitation, see the doc.)
+    #[test]
+    fn the_ureq_shell_keeps_the_three_transport_names_distinct() {
+        use ureq::ErrorKind as UK;
+        assert_eq!(classify_ureq_transport(UK::ConnectionFailed, "Connection refused"), AttemptFailure::Refused);
+        assert_eq!(classify_ureq_transport(UK::Io, "operation timed out"), AttemptFailure::Timeout);
+        assert_eq!(classify_ureq_transport(UK::ConnectionFailed, "dns failure"), AttemptFailure::Unreachable);
+        assert_eq!(classify_ureq_transport(UK::Dns, "no such host"), AttemptFailure::Unreachable);
+        let names = [
+            classify_ureq_transport(UK::ConnectionFailed, "refused").name(),
+            classify_ureq_transport(UK::Io, "timeout").name(),
+            classify_ureq_transport(UK::Dns, "?").name(),
+        ];
+        assert_eq!(names, ["refused", "timeout", "unreachable"]);
     }
 }
