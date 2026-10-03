@@ -22,9 +22,29 @@ pub enum AttemptFailure {
     UpstreamStatus { status: u16, body: String },
     /// HTTP 200 with no usable text. THE case an error-only rule misses.
     EmptyBody,
+    /// HTTP 200 but the body is not the shape we asked for (unparseable / no content path).
+    /// A DIFFERENT fact from `empty-body`: one is "it said nothing", this is "it did not answer the question".
+    BadBody,
 }
 
 impl AttemptFailure {
+    /// The FULL sentence for a boundary that can only carry text (gRPC status). It KEEPS THE NAME first,
+    /// so a reader can still tell the classes apart, and it carries the upstream's own words verbatim
+    /// where there are any (§358.1) — a detail the short name deliberately drops.
+    pub fn describe(&self) -> String {
+        match self {
+            AttemptFailure::Unreachable => "unreachable: the endpoint did not answer".into(),
+            AttemptFailure::Refused => "refused: the endpoint refused the connection".into(),
+            AttemptFailure::Timeout => "timeout: the endpoint went silent past the deadline".into(),
+            AttemptFailure::Http5xx { status } => format!("http-5xx: upstream said {status}"),
+            AttemptFailure::UpstreamStatus { status, body } => {
+                format!("upstream-status: {status} {body}")
+            }
+            AttemptFailure::EmptyBody => "empty-body: HTTP 200 with no usable text".into(),
+            AttemptFailure::BadBody => "bad-body: HTTP 200 in a shape we cannot read".into(),
+        }
+    }
+
     /// One short, stable name per class — the roster reads these, and the criterion requires them distinct.
     pub fn name(&self) -> &'static str {
         match self {
@@ -34,6 +54,7 @@ impl AttemptFailure {
             AttemptFailure::Http5xx { .. } => "http-5xx",
             AttemptFailure::UpstreamStatus { .. } => "upstream-status",
             AttemptFailure::EmptyBody => "empty-body",
+            AttemptFailure::BadBody => "bad-body",
         }
     }
 }
@@ -189,6 +210,7 @@ mod tests {
             AttemptFailure::Http5xx { status: 503 },
             AttemptFailure::UpstreamStatus { status: 429, body: "slow down".into() },
             AttemptFailure::EmptyBody,
+            AttemptFailure::BadBody,
         ];
         let names: Vec<&str> = classes.iter().map(|c| c.name()).collect();
         let mut sorted = names.clone();

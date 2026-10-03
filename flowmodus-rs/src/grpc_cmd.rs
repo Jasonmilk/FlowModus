@@ -97,13 +97,17 @@ impl ReasonService {
 
     /// 调用上游 OpenAI 兼容 chat/completions。tokens 取 usage.total_tokens
     /// （0 也不伪装：上游不给就记 0）。
+    /// THE CALL NAMES ITS OWN FAILURES (ADR-0048 §362/§367). It used to return one prose string
+    /// ("调用上游失败: …"), which cannot be acted on: no failover can tell a refused connection from a
+    /// 429, and an HTTP 200 with an unusable body read as SUCCESS. Every ending is now one of the named
+    /// classes, so the caller can hand over instead of returning the first failure.
     fn call_chat(
         endpoint: &str,
         model: &str,
         prompt: &str,
         max_tokens: u32,
         key: &str,
-    ) -> Result<(String, Option<Usage>), String> {
+    ) -> Result<(String, Option<Usage>), crate::failover::AttemptFailure> {
         let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
         let body = serde_json::json!({
             "model": model,
@@ -115,14 +119,13 @@ impl ReasonService {
             .set("Authorization", &format!("Bearer {key}"))
             .set("Content-Type", "application/json")
             .send_string(&body.to_string())
-            .map_err(|e| {
-                format!("调用上游失败: {e}（确认该供应商的 base_url 与 API key 有效）")
-            })?;
+            .map_err(|e| crate::failover::classify_ureq(&e))?;
         let body = resp
             .into_string()
-            .map_err(|e| format!("读取上游响应失败: {e}"))?;
-        let v: serde_json::Value =
-            serde_json::from_str(&body).map_err(|e| format!("上游响应不是合法 JSON: {e}"))?;
+            /* A read that dies mid-body is a TRANSPORT fact (the peer stopped answering), not a status. */
+            .map_err(|_| crate::failover::AttemptFailure::Unreachable)?;
+        let v: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|_| crate::failover::AttemptFailure::BadBody)?;
         let content = v["choices"][0]["message"]["content"]
             .as_str()
             .unwrap_or("")
@@ -240,7 +243,9 @@ impl FlowModus for ReasonService {
             max_tokens,
             &key,
         )
-        .map_err(Status::aborted)?;
+        /* THE BOUNDARY KEEPS THE NAMES (ADR-0048 §367): gRPC carries text, so the failure is rendered with
+         * its CLASS NAME first and the upstream's own words after it — never collapsed into one prose line. */
+        .map_err(|why| Status::aborted(format!("上游调用失败 [{}]", why.describe())))?;
 
         Ok(Response::new(ReasonResponse {
             content,
