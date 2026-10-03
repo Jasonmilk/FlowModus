@@ -188,7 +188,11 @@ impl<'a> Router<'a> {
 
     /// Auto: the full five-layer deterministic pipeline
     /// (Python v1.7 `_auto_decision` shape, incl. score = 0.0 candidates).
-    pub fn auto(&self, request: &RawRequest) -> Result<RoutingDecision, String> {
+    /// THE HARD-FILTERED SET, EXTRACTED SO BOTH CALLERS SHARE ONE SOURCE (ADR-0048 §366).
+    /// This is the same pipeline `auto` always ran — normalize → eligible → estimate → hard filters —
+    /// with nothing added and nothing removed. Extracting it is what lets the failover list be the SAME
+    /// set the primary choice comes from, instead of a second, drifting computation.
+    fn eligible_candidates(&self, request: &RawRequest) -> Result<Vec<pb::EligibleSupplier>, String> {
         let normalized = normalize_request(request, self.tokenizer_ratios);
         let eligible = get_eligible_suppliers(self.registry, &normalized);
         let estimates = estimate_all(&normalized, &eligible, &self.deviation);
@@ -216,6 +220,19 @@ impl<'a> Router<'a> {
         if eligible_suppliers.is_empty() {
             return Err("no eligible supplier candidates — 无可用模型候选（声明缺失 / 模型为空 / 硬过滤全灭），请先在面板配置供应商并声明模型".into());
         }
+        Ok(eligible_suppliers)
+    }
+
+    /// THE FAILOVER LIST (ADR-0048 §362): every hard-filtered candidate, in the pipeline's own deterministic
+    /// order. `auto` keeps selecting its FIRST choice exactly as before — this only EXPOSES the rest, so the
+    /// runtime can hand over instead of returning the first failure. Exposing is not re-deciding.
+    pub fn auto_candidates(&self, request: &RawRequest) -> Result<Vec<pb::EligibleSupplier>, String> {
+        self.eligible_candidates(request)
+    }
+
+    pub fn auto(&self, request: &RawRequest) -> Result<RoutingDecision, String> {
+        let normalized = normalize_request(request, self.tokenizer_ratios);
+        let eligible_suppliers = self.eligible_candidates(request)?;
         let free_ids: std::collections::HashSet<String> = self
             .registry
             .iter()
@@ -414,6 +431,12 @@ mod tests {
         let health = HealthTracker::new(Default::default());
         let r = router(&reg, &ratios, &bias, &health);
         let d = r.resolve(&RawRequest::default(), "group:nope").expect("auto fallback");
+        /* ADR-0048 §366: the failover LIST and the PRIMARY choice must come from ONE computation.
+         * Mutation: a second, differently-filtered list would not contain the primary ⇒ this fails. */
+        let list = r.auto_candidates(&RawRequest::default()).expect("the list the primary came from");
+        assert!(!list.is_empty(), "the exposed list must not be empty when a primary exists");
+        assert!(list.iter().any(|c| c.supplier_id == d.supplier_id && c.model_id == d.model_id),
+            "the primary {} / {} must be IN the list it was chosen from", d.supplier_id, d.model_id);
         assert!(!d.supplier_id.is_empty());
     }
 
