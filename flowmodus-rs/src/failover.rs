@@ -22,6 +22,9 @@ pub enum AttemptFailure {
     UpstreamStatus { status: u16, body: String },
     /// HTTP 200 with no usable text. THE case an error-only rule misses.
     EmptyBody,
+    /// This candidate has no API key configured. Honest to name: it is neither a transport fact nor an
+    /// upstream verdict, and calling it a 401 would be inventing upstream's words.
+    NoCredential,
     /// HTTP 200 but the body is not the shape we asked for (unparseable / no content path).
     /// A DIFFERENT fact from `empty-body`: one is "it said nothing", this is "it did not answer the question".
     BadBody,
@@ -42,6 +45,7 @@ impl AttemptFailure {
             }
             AttemptFailure::EmptyBody => "empty-body: HTTP 200 with no usable text".into(),
             AttemptFailure::BadBody => "bad-body: HTTP 200 in a shape we cannot read".into(),
+            AttemptFailure::NoCredential => "no-credential: this supplier has no API key configured".into(),
         }
     }
 
@@ -55,6 +59,7 @@ impl AttemptFailure {
             AttemptFailure::UpstreamStatus { .. } => "upstream-status",
             AttemptFailure::EmptyBody => "empty-body",
             AttemptFailure::BadBody => "bad-body",
+            AttemptFailure::NoCredential => "no-credential",
         }
     }
 }
@@ -211,6 +216,7 @@ mod tests {
             AttemptFailure::UpstreamStatus { status: 429, body: "slow down".into() },
             AttemptFailure::EmptyBody,
             AttemptFailure::BadBody,
+            AttemptFailure::NoCredential,
         ];
         let names: Vec<&str> = classes.iter().map(|c| c.name()).collect();
         let mut sorted = names.clone();

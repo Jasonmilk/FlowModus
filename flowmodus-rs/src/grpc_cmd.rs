@@ -236,16 +236,61 @@ impl FlowModus for ReasonService {
                 decision.supplier_id, decision.supplier_id
             ))
         })?;
-        let (content, usage) = Self::call_chat(
-            &decision.endpoint_url,
-            &decision.model_id,
-            &prompt,
-            max_tokens,
-            &key,
-        )
-        /* THE BOUNDARY KEEPS THE NAMES (ADR-0048 §367): gRPC carries text, so the failure is rendered with
-         * its CLASS NAME first and the upstream's own words after it — never collapsed into one prose line. */
-        .map_err(|why| Status::aborted(format!("上游调用失败 [{}]", why.describe())))?;
+        /* THE FAILOVER LIST (ADR-0048 §362/§366): the primary is EXACTLY what `resolve` chose — semantics
+         * unchanged — and the rest of the hard-filtered set follows it in the pipeline's own order.
+         *
+         * TWO DECLARED LIMITS, named rather than implied:
+         *  · A MANUAL/GROUP SELECTOR DOES NOT FAIL OVER (`req.model` non-empty): the caller named a model,
+         *    so answering with a different one would be discarding the request, not serving it.
+         *  · The `modality:` capability is NOT plumbed into this service yet (the three `vec![]` sites are
+         *    deliberately untouched, ADR-0048 §358 ⇒ that work belongs to Rhizax). `modality: None` below
+         *    therefore means "the filter is a DECLARED NO-OP here", not "every candidate is text-capable".
+         *    The rule itself is implemented and tested in `failover::try_candidates`. */
+        let mut cands: Vec<crate::failover::Candidate> = vec![crate::failover::Candidate {
+            supplier_id: decision.supplier_id.clone(),
+            endpoint: decision.endpoint_url.clone(),
+            model: decision.model_id.clone(),
+            modality: None,
+        }];
+        if req.model.trim().is_empty() {
+            if let Ok(rest) = router.auto_candidates(&raw) {
+                for c in rest {
+                    if c.supplier_id == decision.supplier_id && c.model_id == decision.model_id {
+                        continue;   /* the primary is already first: no duplicate attempt */
+                    }
+                    cands.push(crate::failover::Candidate {
+                        supplier_id: c.supplier_id.clone(),
+                        endpoint: c.endpoint_url.clone(),
+                        model: c.model_id.clone(),
+                        modality: None,
+                    });
+                }
+            }
+        }
+        let free_ids: std::collections::HashSet<String> = free
+            .iter()
+            .map(|s| s.supplier_id.clone())
+            .collect();
+        /* `try_candidates` speaks about the ANSWER (the body); the usage breakdown is a second fact that only
+         * the successful attempt carries, so the closure hands it out through this slot (it is `FnMut`).
+         * An absent usage stays absent: the report never invents a zero-filled breakdown. */
+        let mut usage_out: Option<Usage> = None;
+        let content = crate::failover::try_candidates(&cands, |c| {
+            let tier = if free_ids.contains(&c.supplier_id) { Tier::Free } else { Tier::Paid };
+            let key = self
+                .store
+                .api_key(tier, &c.supplier_id)
+                .ok_or(crate::failover::AttemptFailure::NoCredential)?;
+            let (body, u) = Self::call_chat(&c.endpoint, &c.model, &prompt, max_tokens, &key)?;
+            if u.is_some() {
+                usage_out = u;
+            }
+            Ok(body)
+        })
+        /* THE BOUNDARY KEEPS THE NAMES (ADR-0048 §367): gRPC carries text, so the report lists every attempt
+         * with its CLASS NAME — never collapsed into one prose line. */
+        .map_err(|all| Status::aborted(format!("上游调用失败 [{}]", all.report())))?;
+        let usage = usage_out;
 
         Ok(Response::new(ReasonResponse {
             content,
