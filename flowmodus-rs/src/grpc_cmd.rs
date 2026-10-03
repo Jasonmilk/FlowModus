@@ -282,6 +282,10 @@ mod tests {
                 prompt: "hi".into(),
                 model: String::new(),
                 max_tokens: 100,
+                // THE TEST BUILD WAS BROKEN HERE (measured: `missing field cognitive_mode`) — unrelated to
+                // the failover work, and left red it would have hidden every later test in this crate.
+                // Empty string is the DECLARED-ABSENT value for this field (ADR-0048 §346).
+                cognitive_mode: String::new(),
             }))
             .await
         });

@@ -22,6 +22,7 @@ pub mod flowmodus_api {
 
 /// User bias configuration (migrated from Python v1.7 config/bias.py).
 pub mod config;
+pub mod failover;
 
 /// Free/paid supplier registry store (度量衡注册台, 2026-09-09).
 pub mod registry;
