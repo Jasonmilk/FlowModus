@@ -230,12 +230,9 @@ impl FlowModus for ReasonService {
         } else {
             Tier::Paid
         };
-        let key = self.store.api_key(tier, &decision.supplier_id).ok_or_else(|| {
-            Status::failed_precondition(format!(
-                "供应商 {} 未配置 API key —— 请在面板 FlowModus 的 {} 详情里补 key",
-                decision.supplier_id, decision.supplier_id
-            ))
-        })?;
+        /* THE KEY IS LOOKED UP PER CANDIDATE, INSIDE THE LOOP (ADR-0048 §368): the primary's key is no longer
+         * read here, because a missing key for the primary must now hand over like any other failure — and it
+         * is NAMED (`no-credential`) in the final report, which keeps the fact and loses only the old prose. */
         /* THE FAILOVER LIST (ADR-0048 §362/§366): the primary is EXACTLY what `resolve` chose — semantics
          * unchanged — and the rest of the hard-filtered set follows it in the pipeline's own order.
          *
