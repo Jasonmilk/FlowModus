@@ -11,7 +11,7 @@
 
 use crate::config::BiasConfig;
 use crate::flowmodus_api::flow_modus_server::{FlowModus, FlowModusServer};
-use crate::flowmodus_api::{ReasonRequest, ReasonResponse, Usage};
+use crate::flowmodus_api::{ReasonRequest, ReasonResponse, RouteCandidate, RouteTrace, Usage};
 use crate::health::HealthTracker;
 use crate::layer2_5_deviation::DeviationSnapshot;
 use crate::pb::{RawRequest, SupplierDeclaration, UserConstraints};
@@ -302,9 +302,26 @@ impl FlowModus for ReasonService {
         .map_err(|all| Status::aborted(format!("上游调用失败 [{}]", all.report())))?;
         let usage = usage_out;
 
+        /* THE DECISION, RELAYED (2026-10-09). Every field below is read from what this handler
+         * already computed — nothing is inferred to fill the shape. `reason` names WHICH branch the
+         * router took (a declared model vs Auto), which is the question a reader actually has when a
+         * turn costs more than expected. Scores and cost are absent because the router does not
+         * expose them here; inventing a zero would be a fabricated measurement. */
+        let chosen_tier = if free.iter().any(|s| s.supplier_id == decision.supplier_id) { "free" } else { "paid" };
+        let trace = RouteTrace {
+            chosen_supplier: decision.supplier_id.clone(),
+            chosen_model: decision.model_id.clone(),
+            chosen_tier: chosen_tier.to_string(),
+            reason: if req.model.trim().is_empty() { "auto".to_string() } else { "declared-model".to_string() },
+            candidates: cands.iter().map(|c| RouteCandidate {
+                supplier_id: c.supplier_id.clone(),
+                model_id: c.model.clone(),   /* failover::Candidate names it `model` */
+            }).collect(),
+        };
         Ok(Response::new(ReasonResponse {
             content,
             usage,
+            route_trace: Some(trace),
             /* The ROUTED model — `decision.model_id`, not `req.model`. ADR-0036
              * asks for the fact that actually served the call; echoing the
              * caller's request back would be a configured value standing in for a
@@ -342,6 +359,7 @@ mod tests {
                 prompt: "hi".into(),
                 model: String::new(),
                 max_tokens: 100,
+            system: String::new(),
                 // THE TEST BUILD WAS BROKEN HERE (measured: `missing field cognitive_mode`) — unrelated to
                 // the failover work, and left red it would have hidden every later test in this crate.
                 // Empty string is the DECLARED-ABSENT value for this field (ADR-0048 §346).

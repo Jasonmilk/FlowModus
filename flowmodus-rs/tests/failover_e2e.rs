@@ -66,6 +66,7 @@ async fn ask(store: RegistryStore) -> Result<String, tonic::Status> {
         prompt: "hi".into(),
         model: String::new(),          // AUTO: failover is allowed (a manual selector deliberately is not)
         max_tokens: 16,
+            system: String::new(),
         cognitive_mode: "auto".into(),
     }))
     .await?;
