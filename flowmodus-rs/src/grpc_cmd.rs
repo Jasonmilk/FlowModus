@@ -105,13 +105,25 @@ impl ReasonService {
         endpoint: &str,
         model: &str,
         prompt: &str,
+        /* The system message, forwarded as its OWN role. Empty stays empty: no system message.
+         * FlowModus does not author it and does not judge it — it is the caller's identity
+         * declaration, relayed verbatim (VISION: 不判断，只呈现). */
+        system: &str,
         max_tokens: u32,
         key: &str,
     ) -> Result<(String, Option<Usage>), crate::failover::AttemptFailure> {
         let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+        /* TWO ROLES, TWO SLOTS (2026-10-09). The upstream call used to hardcode a single user
+         * message, so a caller's identity had nowhere to go: it was assembled by anaphase and
+         * dropped at the boundary. Folded into a user message it would be context, not authority. */
+        let mut messages: Vec<serde_json::Value> = Vec::new();
+        if !system.trim().is_empty() {
+            messages.push(serde_json::json!({ "role": "system", "content": system }));
+        }
+        messages.push(serde_json::json!({ "role": "user", "content": prompt }));
         let body = serde_json::json!({
             "model": model,
-            "messages": [{ "role": "user", "content": prompt }],
+            "messages": messages,
             "max_tokens": max_tokens,
         });
         let resp = ureq::post(&url)
@@ -159,6 +171,7 @@ impl FlowModus for ReasonService {
     ) -> Result<Response<ReasonResponse>, Status> {
         let req = request.into_inner();
         let prompt = req.prompt.trim().to_string();
+        let system = req.system.clone();
         if prompt.is_empty() {
             return Err(Status::invalid_argument("prompt 为空"));
         }
@@ -278,7 +291,7 @@ impl FlowModus for ReasonService {
                 .store
                 .api_key(tier, &c.supplier_id)
                 .ok_or(crate::failover::AttemptFailure::NoCredential)?;
-            let (body, u) = Self::call_chat(&c.endpoint, &c.model, &prompt, max_tokens, &key)?;
+            let (body, u) = Self::call_chat(&c.endpoint, &c.model, &prompt, &system, max_tokens, &key)?;
             if u.is_some() {
                 usage_out = u;
             }
