@@ -19,4 +19,18 @@ jobs:
       - name: 系统依赖（protoc）
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler && protoc --version
       - name: Rust 侧（硬门）
-        run: cargo test --all-features
+        run: |
+          set +e
+          cargo test --all-features 2>&1 | tee /tmp/rust-gate.log
+          rc=${PIPESTATUS[0]}
+          # ★ 把失败**变成可读的**（2026-10-10）：CI 日志需要 admin 权限 ⇒ 我**读不到**它
+          #   ⇒ 于是把错误写进 artifact（**可下载**）⇒ **静默仪器不能当证据**，在 CI 上同样成立。
+          if [ "$rc" != 0 ]; then
+            echo "--- 末尾 120 行（完整在 artifact: rust-gate-log）---"
+            tail -120 /tmp/rust-gate.log
+          fi
+          exit $rc
+      - name: 上传 Rust 门日志（失败时也上传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rust-gate-log, path: /tmp/rust-gate.log, if-no-files-found: warn }
