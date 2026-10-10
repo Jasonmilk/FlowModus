@@ -29,7 +29,7 @@ jobs:
           #   ⇒ 于是把错误写进 artifact（**可下载**）⇒ **静默仪器不能当证据**，在 CI 上同样成立。
           if [ "$rc" != 0 ]; then
           # ★ 失败具名 → annotations（公开可读）—— 本仓自带脚本（引擎纪律：不跨仓取文件）
-          bash tools/emit-failures.sh /tmp/test.log || true
+          bash tools/emit-failures.sh || true
             echo "--- 末尾 120 行（完整在 artifact: rust-gate-log）---"
             tail -120 /tmp/rust-gate.log
           fi
