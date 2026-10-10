@@ -1,0 +1,42 @@
+# FlowModus · 最小 CI（R4 补齐，2026-10-10）
+#
+# 本仓是 Python + Rust 双栈；**Cargo 在 `flowmodus-rs/`** ⇒ 用 working-directory 而不是 --manifest-path
+# （后者会让"从仓库根跑"与"从子目录跑"给出不同结果 —— 那是一种静默的路径分歧）。
+# 硬门只设 **Rust 侧**：headless、确定、可判（实测本地 `cargo test --all-features` 全 ok）。
+name: ci
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-24.04   # ★ 钉住（2026-10-10）：ubuntu-latest 将于 2026-10-19 迁到 Ubuntu 26
+                           #   ⇒ 不钉住 = 9 天后由【外部变更】决定我们的红绿（"今天绿"可能纯因环境）
+                           #   冻结是默认；预演 26 应是一次【有意】的实验，不是被动接受
+    defaults: { run: { working-directory: flowmodus-rs } }
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      # ★ 为什么需要它（实测根因，非猜测）：本仓的 `build.rs` 调 `prost_build` / `tonic_build`
+      #   ⇒ **构建期需要 `protoc`**；而 ubuntu runner **默认不装** ⇒ CI 红而本地绿
+      #   （本地 `/opt/homebrew/bin/protoc · libprotoc 36.2` 存在 ⇒ 这解释了"本地绿/CI 红"）。
+      #   ★ 这也是"局部绿 ≠ CI 绿"的一个**具体成因**：**本地有的系统依赖，CI 不一定有。**
+      - name: 系统依赖（protoc）
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler && protoc --version
+      - name: Rust 侧（硬门）
+        run: |
+          set +e
+          cargo test --all-features 2>&1 | tee /tmp/rust-gate.log
+          rc=${PIPESTATUS[0]}
+          # ★ 把失败**变成可读的**（2026-10-10）：CI 日志需要 admin 权限 ⇒ 我**读不到**它
+          #   ⇒ 于是把错误写进 artifact（**可下载**）⇒ **静默仪器不能当证据**，在 CI 上同样成立。
+          if [ "$rc" != 0 ]; then
+            echo "--- 末尾 120 行（完整在 artifact: rust-gate-log）---"
+            tail -120 /tmp/rust-gate.log
+          fi
+          exit $rc
+      - name: 失败尾部 → job summary（**公开可读，不依赖 artifact 凭据**）
+        if: failure()
+        run: |
+          { echo '## 失败尾部'; echo '```'; tail -120 /tmp/rust-gate.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+      - name: 上传 Rust 门日志（失败时也上传）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rust-gate-log, path: /tmp/rust-gate.log, if-no-files-found: warn }

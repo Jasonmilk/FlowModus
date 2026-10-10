@@ -11,7 +11,7 @@
 
 use crate::config::BiasConfig;
 use crate::flowmodus_api::flow_modus_server::{FlowModus, FlowModusServer};
-use crate::flowmodus_api::{ReasonRequest, ReasonResponse, Usage};
+use crate::flowmodus_api::{ReasonRequest, ReasonResponse, RouteCandidate, RouteTrace, Usage};
 use crate::health::HealthTracker;
 use crate::layer2_5_deviation::DeviationSnapshot;
 use crate::pb::{RawRequest, SupplierDeclaration, UserConstraints};
@@ -105,13 +105,25 @@ impl ReasonService {
         endpoint: &str,
         model: &str,
         prompt: &str,
+        /* The system message, forwarded as its OWN role. Empty stays empty: no system message.
+         * FlowModus does not author it and does not judge it — it is the caller's identity
+         * declaration, relayed verbatim (VISION: 不判断，只呈现). */
+        system: &str,
         max_tokens: u32,
         key: &str,
     ) -> Result<(String, Option<Usage>), crate::failover::AttemptFailure> {
         let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
+        /* TWO ROLES, TWO SLOTS (2026-10-09). The upstream call used to hardcode a single user
+         * message, so a caller's identity had nowhere to go: it was assembled by anaphase and
+         * dropped at the boundary. Folded into a user message it would be context, not authority. */
+        let mut messages: Vec<serde_json::Value> = Vec::new();
+        if !system.trim().is_empty() {
+            messages.push(serde_json::json!({ "role": "system", "content": system }));
+        }
+        messages.push(serde_json::json!({ "role": "user", "content": prompt }));
         let body = serde_json::json!({
             "model": model,
-            "messages": [{ "role": "user", "content": prompt }],
+            "messages": messages,
             "max_tokens": max_tokens,
         });
         let resp = ureq::post(&url)
@@ -159,6 +171,7 @@ impl FlowModus for ReasonService {
     ) -> Result<Response<ReasonResponse>, Status> {
         let req = request.into_inner();
         let prompt = req.prompt.trim().to_string();
+        let system = req.system.clone();
         if prompt.is_empty() {
             return Err(Status::invalid_argument("prompt 为空"));
         }
@@ -278,7 +291,7 @@ impl FlowModus for ReasonService {
                 .store
                 .api_key(tier, &c.supplier_id)
                 .ok_or(crate::failover::AttemptFailure::NoCredential)?;
-            let (body, u) = Self::call_chat(&c.endpoint, &c.model, &prompt, max_tokens, &key)?;
+            let (body, u) = Self::call_chat(&c.endpoint, &c.model, &prompt, &system, max_tokens, &key)?;
             if u.is_some() {
                 usage_out = u;
             }
@@ -289,9 +302,26 @@ impl FlowModus for ReasonService {
         .map_err(|all| Status::aborted(format!("上游调用失败 [{}]", all.report())))?;
         let usage = usage_out;
 
+        /* THE DECISION, RELAYED (2026-10-09). Every field below is read from what this handler
+         * already computed — nothing is inferred to fill the shape. `reason` names WHICH branch the
+         * router took (a declared model vs Auto), which is the question a reader actually has when a
+         * turn costs more than expected. Scores and cost are absent because the router does not
+         * expose them here; inventing a zero would be a fabricated measurement. */
+        let chosen_tier = if free.iter().any(|s| s.supplier_id == decision.supplier_id) { "free" } else { "paid" };
+        let trace = RouteTrace {
+            chosen_supplier: decision.supplier_id.clone(),
+            chosen_model: decision.model_id.clone(),
+            chosen_tier: chosen_tier.to_string(),
+            reason: if req.model.trim().is_empty() { "auto".to_string() } else { "declared-model".to_string() },
+            candidates: cands.iter().map(|c| RouteCandidate {
+                supplier_id: c.supplier_id.clone(),
+                model_id: c.model.clone(),   /* failover::Candidate names it `model` */
+            }).collect(),
+        };
         Ok(Response::new(ReasonResponse {
             content,
             usage,
+            route_trace: Some(trace),
             /* The ROUTED model — `decision.model_id`, not `req.model`. ADR-0036
              * asks for the fact that actually served the call; echoing the
              * caller's request back would be a configured value standing in for a
@@ -329,6 +359,7 @@ mod tests {
                 prompt: "hi".into(),
                 model: String::new(),
                 max_tokens: 100,
+            system: String::new(),
                 // THE TEST BUILD WAS BROKEN HERE (measured: `missing field cognitive_mode`) — unrelated to
                 // the failover work, and left red it would have hidden every later test in this crate.
                 // Empty string is the DECLARED-ABSENT value for this field (ADR-0048 §346).

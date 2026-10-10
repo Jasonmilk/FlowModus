@@ -1,0 +1,74 @@
+{
+  "supplier_id": "mock-llm",
+  "supplier_name": "Mock LLM",
+  "verified": false,
+  "updated_at_unix": 1790220657,
+  "models": [
+    {
+      "model_id": "mock-chat-1",
+      "display_name": "mock-chat-1",
+      "lang": "en",
+      "semantic_tags": [
+        "fast"
+      ],
+      "agent_roles": [],
+      "billing": {
+        "currency": "",
+        "token_input": 0.0,
+        "token_output": 0.0,
+        "compute_ms": 0.0,
+        "audio_sec": 0.0,
+        "video_frame": 0.0,
+        "free_quota_daily": 0,
+        "rules": [],
+        "allowances": []
+      },
+      "kv_cache": null,
+      "capabilities": null,
+      "tokenizer_compression_ratio": 0.0,
+      "capability_tags": [
+        "modality:text"
+      ]
+    },
+    {
+      "model_id": "mock-reasoner",
+      "display_name": "mock-reasoner",
+      "lang": "en",
+      "semantic_tags": [
+        "reasoning"
+      ],
+      "agent_roles": [],
+      "billing": {
+        "currency": "",
+        "token_input": 0.0,
+        "token_output": 0.0,
+        "compute_ms": 0.0,
+        "audio_sec": 0.0,
+        "video_frame": 0.0,
+        "free_quota_daily": 0,
+        "rules": [],
+        "allowances": []
+      },
+      "kv_cache": null,
+      "capabilities": null,
+      "tokenizer_compression_ratio": 0.0,
+      "capability_tags": [
+        "modality:text"
+      ]
+    }
+  ],
+  "endpoints": [
+    {
+      "type": "openai",
+      "region": "",
+      "base_url": "http://127.0.0.1:59099/v1",
+      "tls_version": "",
+      "auth_method": "bearer_token",
+      "priority": 1,
+      "provision_url": "",
+      "documentation_url": ""
+    }
+  ],
+  "compliance": null,
+  "rate_limits": null
+}
