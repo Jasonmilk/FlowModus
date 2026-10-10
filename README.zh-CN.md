@@ -10,6 +10,20 @@
 
 ---
 
+
+## ▸ 从这里开始（**按需指针**：先看你要回答的**问题**，只取那一份）
+
+> **状态是【量出来】的，不是存在这里的**（徽章与计数是快照，会腐 ⇒ 以自证命令为准）。
+
+| 我要回答的问题 | 读这一份 |
+|---|---|
+| **本仓现在健康吗？怎么自证？** | `cargo test --all-features` |
+| **本仓的规矩 / 判据的正文？** | `docs/decisions/`（或各仓对应目录） |
+| **遇到怪事 / 想知道是否已知？** | `helix-mind/docs/helixECO/KNOWN_ISSUES.md` —— **唯一**跨仓登记册 |
+| **我们现在在哪？下一步？（合拢现状）** | `helix-mind/docs/helixECO/STATUS-2026-10-10.md` |
+| **判据在骗我吗？（假绿/静音/零）** | `helix-mind/docs/helixECO/DIAGNOSIS-METHODS.md` |
+| **生态入口？** | `helix-mind/docs/helixECO/HANDOFF.md` —— ≤40 行指针，状态用量测命令 |
+
 ## 是什么
 
 FlowModus 不是网关，不是代理，不是管理台。它是一套**度量衡**——LLM API 调度的
