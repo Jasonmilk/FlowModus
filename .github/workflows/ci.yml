@@ -30,6 +30,10 @@ jobs:
             tail -120 /tmp/rust-gate.log
           fi
           exit $rc
+      - name: 失败尾部 → job summary（**公开可读，不依赖 artifact 凭据**）
+        if: failure()
+        run: |
+          { echo '## 失败尾部'; echo '```'; tail -120 /tmp/rust-gate.log 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
       - name: 上传 Rust 门日志（失败时也上传）
         if: always()
         uses: actions/upload-artifact@v4
