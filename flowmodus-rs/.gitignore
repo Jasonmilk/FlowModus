@@ -5,6 +5,8 @@ __pycache__/
 .venv/
 registry/free/*.json
 registry/paid/*.json
+# 例外：测试模板（failover_e2e.rs 的"生产注册表文件模板"；CI checkout 无此文件 ⇒ 本地绿/CI 红 exit 101）
+!registry/free/mock-llm.json
 
 # 供应商 API key：机密，绝不入库（与声明文件分离，权限 600）
 registry/.secrets/
