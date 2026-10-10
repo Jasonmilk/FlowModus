@@ -1,0 +1,16 @@
+# FlowModus · 最小 CI（R4 补齐，2026-10-10）
+#
+# 本仓是 Python + Rust 双栈；**Cargo 在 `flowmodus-rs/`** ⇒ 用 working-directory 而不是 --manifest-path
+# （后者会让"从仓库根跑"与"从子目录跑"给出不同结果 —— 那是一种静默的路径分歧）。
+# 硬门只设 **Rust 侧**：headless、确定、可判（实测本地 `cargo test --all-features` 全 ok）。
+name: ci
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: flowmodus-rs } }
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Rust 侧（硬门）
+        run: cargo test --all-features
