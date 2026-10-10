@@ -12,5 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal && rustup default stable
+      # ★ 为什么需要它（实测根因，非猜测）：本仓的 `build.rs` 调 `prost_build` / `tonic_build`
+      #   ⇒ **构建期需要 `protoc`**；而 ubuntu runner **默认不装** ⇒ CI 红而本地绿
+      #   （本地 `/opt/homebrew/bin/protoc · libprotoc 36.2` 存在 ⇒ 这解释了"本地绿/CI 红"）。
+      #   ★ 这也是"局部绿 ≠ CI 绿"的一个**具体成因**：**本地有的系统依赖，CI 不一定有。**
+      - name: 系统依赖（protoc）
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler && protoc --version
       - name: Rust 侧（硬门）
         run: cargo test --all-features
