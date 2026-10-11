@@ -1,5 +1,7 @@
 # FlowModus VISION
 
+> **对齐链**：生态方法论之根在 **phyt-DNA 的 `VISION.md`**（本文件是**本项目的方向读数**，两者不是一个轴：方法论之根 ↔ 项目自己的知识基准）。〔2026-10-11 加〕
+
 > **LLM 领域的度量衡局**——中立、确定性、去中心化的调度规则定义协议。
 > 版本 v2.0-rs（重构宣言）｜ 2026-09-06 ｜ Jason Milk / CommonIntents
 > © 2026 Jason Milk · Apache 2.0（防御性公开见 docs/prior-art.md）
