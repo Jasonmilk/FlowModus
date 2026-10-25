@@ -83,15 +83,9 @@ impl Cli {
                     }
                 }
             }
-            "route" => {
-                return cmd_route(&args[1..]);
-            }
-            "serve" => {
-                return crate::serve_cmd::cmd_serve(&args[1..]);
-            }
-            "grpc" => {
-                return crate::grpc_cmd::cmd_grpc(&args[1..]);
-            }
+            "route" => cmd_route(&args[1..]),
+            "serve" => crate::serve_cmd::cmd_serve(&args[1..]),
+            "grpc" => crate::grpc_cmd::cmd_grpc(&args[1..]),
             other => {
                 eprintln!("unknown command: {other}");
                 2

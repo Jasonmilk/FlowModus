@@ -238,11 +238,10 @@ impl FlowModus for ReasonService {
         })?;
 
         // 3) 取 key（本机 .secrets，唯一来源），调上游
-        let tier = if free.iter().any(|s| s.supplier_id == decision.supplier_id) {
-            Tier::Free
-        } else {
-            Tier::Paid
-        };
+        /* ADR-0048 §368 之后：primary 的 tier 不再在此处预先判定 —— key 改为在循环内
+         * per-candidate 查（见下方 §368 注释），原先那个 `tier` 局部变量因此成为孤儿
+         * （rustc: unused_variables）。删除它，而不是加下划线前缀——它没有读者，
+         * 留着只会让人误以为 tier 在这里参与了决策。tier 的真实判定点是循环内第 289 行。 */
         /* THE KEY IS LOOKED UP PER CANDIDATE, INSIDE THE LOOP (ADR-0048 §368): the primary's key is no longer
          * read here, because a missing key for the primary must now hand over like any other failure — and it
          * is NAMED (`no-credential`) in the final report, which keeps the fact and loses only the old prose. */

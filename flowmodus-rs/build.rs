@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .out_dir(&grpc_out)
         .build_server(true)
         .build_client(false)
-        .compile(&["proto/flowmodus.proto"], &["proto"])?;
+        .compile_protos(&["proto/flowmodus.proto"], &["proto"])?;
     println!("cargo:rerun-if-changed=proto");
     Ok(())
 }

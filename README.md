@@ -48,7 +48,7 @@ The pipeline presents metering, cost, filtering and scoring all as deterministic
 
 | Branch | Content | Status |
 |---|---|---|
-| **rs** | Rust rebuild (R-1..R-6 all complete) | ✅ primary, 83 tests green, clippy zero warnings |
+| **rs** | Rust rebuild (R-1..R-6 all complete) | ✅ primary, 109 tests green, clippy zero warnings |
 | **main** | Python v1.7 (original whitepaper implementation) | 🧊 frozen maintenance |
 
 The **current trunk** (see `bash tools/branch-map.sh`; historically named `rs`) is the deterministic rebuild: three call modes truly landed (Python's Group was a placeholder stub), failure-cooldown recovery completed (Python's health had consumers but no producer), canonicalizer fills the Unicode NFC protocol gap (Python only sorted keys).

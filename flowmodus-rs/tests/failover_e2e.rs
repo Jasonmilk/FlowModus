@@ -60,6 +60,10 @@ fn temp_root(tag: &str) -> std::path::PathBuf {
     p
 }
 
+/* clippy::result_large_err: `tonic::Status` 本身就有 176 字节 —— 它是 tonic 的类型，
+ * 不是本仓能改小的。在这里把它 Box 起来只会让测试读起来更绕，且不影响被测行为。
+ * 事实留在这里（allow + 原因），而不是无声地让 `-D warnings` 在 CI 上变红。 */
+#[allow(clippy::result_large_err)]
 async fn ask(store: RegistryStore) -> Result<String, tonic::Status> {
     let svc = ReasonService::new(store);
     let resp = FlowModus::reason(&svc, Request::new(ReasonRequest {
